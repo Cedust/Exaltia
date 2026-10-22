@@ -34,22 +34,22 @@ const list: CreatureDef[] = [
   },
   {
     id: 'spark-monk', name: 'Spark Monk', kind: 'acolyte', element: 'thunder', role: 'Striker',
-    stats: { lifeforce: 480, might: 66, resonance: 30, guard: 40, ward: 35, swiftness: 62, essence: 50 },
+    stats: { lifeforce: 670, might: 89, resonance: 40, guard: 40, ward: 35, swiftness: 62, essence: 50 },
     skills: ['thunder-palm', 'spark-rush'], basicAttack: 'basic-attack',
   },
   {
     id: 'relic-archer', name: 'Relic Archer', kind: 'acolyte', element: 'physical', role: 'Archer',
-    stats: { lifeforce: 380, might: 60, resonance: 20, guard: 30, ward: 35, swiftness: 50, essence: 60 },
+    stats: { lifeforce: 530, might: 81, resonance: 27, guard: 30, ward: 35, swiftness: 50, essence: 60 },
     skills: ['piercing-shot', 'snipe'], basicAttack: 'basic-attack',
   },
   {
     id: 'kyrael', name: 'Kyrael', kind: 'paragon', element: 'ice', role: 'Front Striker',
-    stats: { lifeforce: 640, might: 82, resonance: 35, guard: 50, ward: 45, swiftness: 66, essence: 60 },
+    stats: { lifeforce: 740, might: 90, resonance: 38, guard: 50, ward: 45, swiftness: 66, essence: 60 },
     skills: ['frost-fang', 'glacial-pounce', 'rending-claws'], basicAttack: 'basic-attack',
   },
   {
     id: 'nivaris', name: 'Nivaris', kind: 'paragon', element: 'ice', role: 'Back Support',
-    stats: { lifeforce: 460, might: 25, resonance: 72, guard: 35, ward: 65, swiftness: 48, essence: 80 },
+    stats: { lifeforce: 530, might: 28, resonance: 79, guard: 35, ward: 65, swiftness: 48, essence: 80 },
     skills: ['winter-mend', 'hoarfrost', 'blizzard'], basicAttack: 'basic-attack',
   },
 ]

@@ -32,3 +32,30 @@ describe('Spike 1 content', () => {
     expect(performance.now() - started).toBeLessThan(10000)
   })
 })
+
+/** Balancing guard for Spike 1: each encounter teaches its lesson. Update deliberately when retuning. */
+describe('Spike 1 balance', () => {
+  const winRate = (preset: string, encounter: string, seeds = 40) => {
+    const enemy = ENCOUNTERS.find((e) => e.id === encounter)!.enemy
+    let wins = 0
+    for (let seed = 0; seed < seeds; seed++) {
+      if (runBattle({ player: PRESETS[preset], enemy, seed }, CONTENT).winner === 'player') wins++
+    }
+    return wins / seeds
+  }
+
+  it('Frost Wardens is won by the naive plan', () => {
+    expect(winRate('naive', 'frost-wardens')).toBeGreaterThanOrEqual(0.9)
+  })
+
+  it('Storm and Arrow punishes stacking a Lane and rewards splitting up', () => {
+    expect(winRate('naive', 'storm-and-arrow')).toBeLessThanOrEqual(0.1)
+    expect(winRate('storm-split', 'storm-and-arrow')).toBeGreaterThanOrEqual(0.8)
+  })
+
+  it('The Winter Court beats the naive plan but not a thought-out one', () => {
+    expect(winRate('naive', 'winter-court')).toBeLessThanOrEqual(0.1)
+    expect(winRate('winter-burn', 'winter-court')).toBeGreaterThanOrEqual(0.8)
+    expect(winRate('winter-sustain', 'winter-court')).toBeGreaterThanOrEqual(0.8)
+  })
+})

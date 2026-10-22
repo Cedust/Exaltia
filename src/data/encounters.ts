@@ -33,7 +33,7 @@ export const ENCOUNTERS: Encounter[] = [
   {
     id: 'storm-and-arrow',
     name: 'Storm and Arrow',
-    description: 'A fast Spark Monk rushes down a Lane while a Relic Archer snipes the Back Row.',
+    description: 'A fast Spark Monk rushes through a whole Lane with Spark Rush while a Relic Archer snipes the Back Row.',
     enemy: {
       members: [
         {
