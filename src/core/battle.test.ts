@@ -171,3 +171,25 @@ describe('runBattle', () => {
     for (const line of actionLines) expect(line).toMatch(/Tactic \d: |Fallback: no Tactic matched/)
   })
 })
+
+describe('conditions narrow targets', () => {
+  const c = content(
+    creature('fast', { stats: stats({ swiftness: 100 }) }),
+    creature('ice-foe', { element: 'ice' }),
+    creature('b'),
+  )
+
+  it('only hits enemies that match an enemy Condition', () => {
+    const tactics = [{ condition: { type: 'enemyWeakTo' as const, element: 'fire' as const }, skill: 'fireball', target: 'lowestLifeforce' as const }]
+    const enemy = team(member('b', 0, 'front'), member('ice-foe', 2, 'front'))
+    const result = runBattle({ player: team(member('fast', 0, 'front', tactics)), enemy, seed: 1 }, c)
+    expect(ofType(result.events, 'actionChosen')[0]).toMatchObject({ skill: 'fireball', targets: ['enemy-1'] })
+  })
+
+  it('skips the Tactic when the matching enemy is protected', () => {
+    const tactics = [{ condition: { type: 'enemyWeakTo' as const, element: 'fire' as const }, skill: 'fireball', target: 'lowestLifeforce' as const }]
+    const enemy = team(member('b', 1, 'front'), member('ice-foe', 1, 'back'))
+    const result = runBattle({ player: team(member('fast', 1, 'front', tactics)), enemy, seed: 1 }, c)
+    expect(ofType(result.events, 'actionChosen')[0]).toMatchObject({ skill: 'basic', tactic: null })
+  })
+})

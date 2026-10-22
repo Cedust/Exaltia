@@ -1,6 +1,6 @@
 import { isWeakTo } from './rules'
-import type { SkillDef, TargetPriority } from './types'
-import { isAlive, lifeforceRatio, type Unit } from './unit'
+import type { Condition, SkillDef, TargetPriority } from './types'
+import { hasStatus, isAlive, lifeforceRatio, type Unit } from './unit'
 
 /** Units a skill may pick as its primary target, before the Target Priority chooses one. */
 export function candidates(skill: SkillDef, actor: Unit, units: Unit[]): Unit[] {
@@ -12,6 +12,26 @@ export function candidates(skill: SkillDef, actor: Unit, units: Unit[]): Unit[] 
   // The Back Row is protected while anyone stands in the Front Row.
   const front = enemies.filter((u) => u.position.row === 'front')
   return front.length > 0 ? front : enemies
+}
+
+/**
+ * Conditions about enemies or allies also narrow who the Tactic may target, so
+ * "If Enemy is Weak to Fire → Flame Burst" only ever hits an enemy that is Weak to Fire.
+ */
+export function conditionFilter(condition: Condition, skill: SkillDef): (unit: Unit) => boolean {
+  const damage = skill.effect === 'damage'
+  switch (condition.type) {
+    case 'enemyWeakTo':
+      return (u) => !damage || isWeakTo(u.creature.element, condition.element)
+    case 'enemyWithoutStatus':
+      return (u) => !damage || !hasStatus(u, condition.status)
+    case 'enemyHasStatus':
+      return (u) => !damage || hasStatus(u, condition.status)
+    case 'allyLifeforceBelow':
+      return (u) => damage || lifeforceRatio(u) * 100 < condition.percent
+    default:
+      return () => true
+  }
 }
 
 const byPosition = (a: Unit, b: Unit) =>
@@ -37,8 +57,15 @@ function score(priority: TargetPriority, unit: Unit, actor: Unit, skill: SkillDe
 }
 
 /** Applies the Target Priority, then expands the primary target by the skill's Target Pattern. */
-export function selectTargets(skill: SkillDef, priority: TargetPriority, actor: Unit, units: Unit[]): Unit[] {
+export function selectTargets(
+  skill: SkillDef,
+  priority: TargetPriority,
+  actor: Unit,
+  units: Unit[],
+  allowed: (unit: Unit) => boolean = () => true,
+): Unit[] {
   const pool = candidates(skill, actor, units)
+    .filter(allowed)
     .map((unit) => ({ unit, score: score(priority, unit, actor, skill) }))
     .filter((c) => c.score !== Infinity)
     .sort((a, b) => a.score - b.score || byPosition(a.unit, b.unit))

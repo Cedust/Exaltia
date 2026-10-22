@@ -1,5 +1,5 @@
 import { RULES, isWeakTo } from './rules'
-import { selectTargets } from './targeting'
+import { conditionFilter, selectTargets } from './targeting'
 import type { Condition, Content, SkillDef } from './types'
 import { hasStatus, isAlive, lifeforceRatio, type Unit } from './unit'
 
@@ -33,13 +33,16 @@ export interface Action {
   targets: Unit[]
 }
 
-/** Checks Tactics top-down; the first affordable one whose Condition holds and that finds a target fires. */
+/**
+ * Checks Tactics top-down; the first affordable one whose Condition holds and that finds a target fires.
+ * Targets must match the Condition where it names enemies or allies (see conditionFilter).
+ */
 export function chooseAction(actor: Unit, units: Unit[], content: Content): Action | null {
   for (const [index, tactic] of actor.tactics.entries()) {
     const skill = content.skills[tactic.skill]
     if (actor.essence < skill.cost) continue
     if (!conditionMet(tactic.condition, actor, units)) continue
-    const targets = selectTargets(skill, tactic.target, actor, units)
+    const targets = selectTargets(skill, tactic.target, actor, units, conditionFilter(tactic.condition, skill))
     if (targets.length > 0) return { skill, tactic: index, targets }
   }
   const basic = content.skills[actor.creature.basicAttack]
