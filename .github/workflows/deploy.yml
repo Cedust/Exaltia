@@ -8,9 +8,11 @@ on:
 permissions:
   contents: write
 
-# Shared with the PR preview workflow so pushes to gh-pages never race.
+# One deploy at a time; a newer push to main replaces a waiting one, so the latest main always ships.
+# Not shared with PR previews: a shared group let a preview cleanup cancel a waiting main deploy.
+# Concurrent pushes to gh-pages are retried by the deploy action.
 concurrency:
-  group: gh-pages
+  group: deploy-main
   cancel-in-progress: false
 
 jobs:

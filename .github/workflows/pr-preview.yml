@@ -8,8 +8,9 @@ permissions:
   contents: write
   pull-requests: write
 
+# Per PR, so one PR's preview never cancels another PR's or the main deploy.
 concurrency:
-  group: gh-pages
+  group: preview-${{ github.event.number }}
   cancel-in-progress: false
 
 jobs:
