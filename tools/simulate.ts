@@ -34,7 +34,7 @@ for (const encounter of encounters.map((e) => e!)) {
   if (values.log) {
     const result = runBattle({ player, enemy: encounter.enemy, seed }, CONTENT)
     console.log(`\n# ${encounter.name} (preset ${values.preset}, seed ${seed})\n`)
-    console.log(formatBattleLog(result.events).join('\n'))
+    console.log(formatBattleLog(result.events).map((line) => line.text).join('\n'))
     continue
   }
 

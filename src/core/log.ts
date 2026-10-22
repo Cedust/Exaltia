@@ -50,14 +50,21 @@ const TARGET_NAMES: Record<TargetPriority, string> = {
 
 export const describeTarget = (priority: TargetPriority) => TARGET_NAMES[priority]
 
+export interface BattleLogLine {
+  /** Index of the event this line describes, so playback can reveal lines as it goes. */
+  event: number
+  text: string
+}
+
 /** Turns the event stream into readable Battle Log lines; every action names the Tactic that fired. */
-export function formatBattleLog(events: BattleEvent[]): string[] {
+export function formatBattleLog(events: BattleEvent[]): BattleLogLine[] {
   const units = new Map<string, UnitSnapshot>()
   const name = (id: string) => units.get(id)?.name ?? id
   const lifeforce = (id: string, value: number) => `LF ${value}/${units.get(id)?.maxLifeforce ?? '?'}`
-  const lines: string[] = []
+  const lines: BattleLogLine[] = []
 
-  for (const event of events) {
+  for (const [index, event] of events.entries()) {
+    const push = (text: string) => lines.push({ event: index, text })
     switch (event.type) {
       case 'battleStarted':
         for (const unit of event.units) units.set(unit.id, unit)
@@ -65,42 +72,42 @@ export function formatBattleLog(events: BattleEvent[]): string[] {
           const team = event.units
             .filter((u) => u.side === side)
             .map((u) => `${u.name} (Lane ${u.position.lane + 1} ${u.position.row === 'front' ? 'Front' : 'Back'})`)
-          lines.push(`${side === 'player' ? 'Player' : 'Enemy'}: ${team.join(', ')}`)
+          push(`${side === 'player' ? 'Player' : 'Enemy'}: ${team.join(', ')}`)
         }
         break
       case 'turnStarted':
-        lines.push(`— Turn ${event.turn}: ${name(event.actor)} (ESS ${event.essence})`)
+        push(`— Turn ${event.turn}: ${name(event.actor)} (ESS ${event.essence})`)
         break
       case 'statusTicked':
-        lines.push(`  ${name(event.unit)} suffers ${event.amount} from ${statusName(event.status)} · ${lifeforce(event.unit, event.lifeforce)}`)
+        push(`  ${name(event.unit)} suffers ${event.amount} from ${statusName(event.status)} · ${lifeforce(event.unit, event.lifeforce)}`)
         break
       case 'statusExpired':
-        lines.push(`  ${statusName(event.status)} wears off ${name(event.unit)}`)
+        push(`  ${statusName(event.status)} wears off ${name(event.unit)}`)
         break
       case 'actionChosen': {
         const reason =
           event.tactic === null
             ? 'Fallback: no Tactic matched'
             : `Tactic ${event.tactic + 1}: ${describeCondition(event.condition!)}`
-        lines.push(`  ${name(event.actor)} → ${event.skillName} → ${event.targets.map(name).join(', ')} · ${reason}`)
+        push(`  ${name(event.actor)} → ${event.skillName} → ${event.targets.map(name).join(', ')} · ${reason}`)
         break
       }
       case 'damageDealt':
-        lines.push(
+        push(
           `  ${name(event.target)} takes ${event.amount}${event.weakness ? ' (WEAK!)' : ''} · ${lifeforce(event.target, event.lifeforce)}`,
         )
         break
       case 'healed':
-        lines.push(`  ${name(event.target)} recovers ${event.amount} · ${lifeforce(event.target, event.lifeforce)}`)
+        push(`  ${name(event.target)} recovers ${event.amount} · ${lifeforce(event.target, event.lifeforce)}`)
         break
       case 'statusApplied':
-        lines.push(`  ${name(event.target)} is afflicted with ${statusName(event.status)} (${event.turns} turns)`)
+        push(`  ${name(event.target)} is afflicted with ${statusName(event.status)} (${event.turns} turns)`)
         break
       case 'defeated':
-        lines.push(`  ${name(event.unit)} is defeated!`)
+        push(`  ${name(event.unit)} is defeated!`)
         break
       case 'battleEnded':
-        lines.push(
+        push(
           event.winner === 'draw'
             ? `Draw after ${event.turns} turns.`
             : `${event.winner === 'player' ? 'Victory' : 'Defeat'} after ${event.turns} turns.`,
