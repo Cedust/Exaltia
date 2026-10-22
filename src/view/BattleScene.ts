@@ -3,10 +3,22 @@ import { describeCondition, statusName } from '../core/log'
 import type { BattleEvent, BattleResult, Element, Side, StatusId, UnitSnapshot } from '../core/types'
 import { CREATURES } from '../data/creatures'
 
-/** Shared, mutable playback settings; the React controls change them while a battle plays. */
-export interface Playback {
+/** Playback settings shared with React: the controls change them while the scene reads them each step. */
+export class Playback {
   speed: number
-  skip: boolean
+  skip = false
+
+  constructor(speed = 1) {
+    this.speed = speed
+  }
+
+  setSpeed(speed: number) {
+    this.speed = speed
+  }
+
+  skipToEnd() {
+    this.skip = true
+  }
 }
 
 export interface BattleSceneData {
@@ -131,7 +143,7 @@ export class BattleScene extends Phaser.Scene {
   private views = new Map<string, UnitView>()
   private cells = new Map<string, Phaser.GameObjects.Rectangle>()
   private turnOrder?: Phaser.GameObjects.Container
-  private playback: Playback = { speed: 1, skip: false }
+  private playback = new Playback()
   private onProgress?: (eventIndex: number) => void
   private result?: BattleResult
   private cancelled = false
@@ -142,7 +154,7 @@ export class BattleScene extends Phaser.Scene {
 
   init(data: BattleSceneData) {
     this.result = data.result
-    this.playback = data.playback ?? { speed: 1, skip: false }
+    this.playback = data.playback ?? new Playback()
     this.onProgress = data.onProgress
     this.views = new Map()
     this.cells = new Map()
