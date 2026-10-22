@@ -166,7 +166,7 @@ describe('runBattle', () => {
     const tactics = [{ condition: { type: 'always' as const }, skill: 'strike', target: 'sameLane' as const }]
     const result = runBattle({ player: team(member('a', 1, 'front', tactics)), enemy: team(member('b', 1, 'front')), seed: 1 }, c)
     const log = formatBattleLog(result.events)
-    const actionLines = log.filter((line) => line.includes(' → '))
+    const actionLines = log.map((line) => line.text).filter((text) => text.includes(' → '))
     expect(actionLines.length).toBe(ofType(result.events, 'actionChosen').length)
     for (const line of actionLines) expect(line).toMatch(/Tactic \d: |Fallback: no Tactic matched/)
   })
