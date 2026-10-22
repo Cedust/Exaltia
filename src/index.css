@@ -1,0 +1,26 @@
+@import 'tailwindcss';
+
+/* Element color worlds from the concept doc, usable as e.g. bg-fire / text-ice. */
+@theme {
+  --color-fire: #e8642c;
+  --color-ice: #2f6fd6;
+  --color-thunder: #f2c94c;
+  --color-water: #2bb5a8;
+  --color-earth: #3f9d5a;
+  --color-wind: #cfe8e6;
+  --color-radiance: #f4e3b0;
+  --color-umbra: #3b2f6b;
+  --color-physical: #9aa0a6;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  background: #0f1117;
+  color: #e8e6e3;
+}
