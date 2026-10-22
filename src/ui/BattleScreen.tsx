@@ -64,11 +64,12 @@ export function BattleScreen({
           </button>
         </div>
       </div>
-      <div className="flex min-h-0 flex-1">
-        <main className="relative min-w-0 flex-1">
+      {/* Narrow screens stack the battlefield (16:9) above the log; wide screens put the log beside it. */}
+      <div className="flex min-h-0 flex-1 flex-col lg:flex-row">
+        <main className="relative aspect-video w-full shrink-0 lg:aspect-auto lg:min-w-0 lg:flex-1">
           <PhaserGame battle={battle} />
           {finished && (
-            <div className="absolute inset-x-0 bottom-6 flex justify-center">
+            <div className="absolute inset-x-0 bottom-2 flex justify-center px-2 lg:bottom-6">
               <div className="flex flex-wrap items-center gap-2 rounded-lg border border-white/15 bg-black/80 px-4 py-3">
                 <span className="mr-2 font-semibold">
                   {outcome} after {result.turns} turns
@@ -89,7 +90,7 @@ export function BattleScreen({
             </div>
           )}
         </main>
-        <aside className="flex w-96 shrink-0 flex-col border-l border-white/10">
+        <aside className="flex min-h-48 flex-1 flex-col border-t border-white/10 lg:w-96 lg:flex-none lg:border-l lg:border-t-0">
           <h3 className="border-b border-white/10 px-3 py-2 text-sm font-semibold">Battle Log</h3>
           <div className="min-h-0 flex-1 overflow-y-auto px-3 py-2 font-mono text-xs leading-relaxed">
             {visible.map((line, i) => (
