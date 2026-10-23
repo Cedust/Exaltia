@@ -39,7 +39,10 @@ export function BattleScreen({
   const log = useMemo(() => formatBattleLog(result.events), [result])
   const visible = log.filter((line) => line.event <= progress)
   const finished = progress >= result.events.length - 1
-  useEffect(() => logEnd.current?.scrollIntoView({ block: 'end' }), [visible.length])
+  // Braces matter: newer Chrome returns a Promise from scrollIntoView, which React would call as a cleanup.
+  useEffect(() => {
+    logEnd.current?.scrollIntoView({ block: 'end' })
+  }, [visible.length])
 
   const changeSpeed = (value: number) => {
     onSpeedChange(value)
