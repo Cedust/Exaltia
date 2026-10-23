@@ -10,9 +10,12 @@
     "preview": "vite preview",
     "test": "vitest run",
     "typecheck": "tsc -b",
-    "sim": "tsx tools/simulate.ts"
+    "campaign": "tsx tools/campaign.ts"
   },
   "dependencies": {
+    "@fontsource/alegreya-sans": "^5.3.0",
+    "@fontsource/cinzel": "^5.3.0",
+    "@fontsource/cormorant-garamond": "^5.3.0",
     "phaser": "^4.2.1",
     "react": "^19.3.1",
     "react-dom": "^19.3.1"

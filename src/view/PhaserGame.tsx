@@ -1,14 +1,8 @@
 import Phaser from 'phaser'
 import { useEffect, useRef } from 'react'
 import { reportProblem } from '../ui/report'
-import { BattleScene, type BattleSceneData } from './BattleScene'
+import { BattleScene, canvasSize, type BattleSceneData, type Orientation } from './BattleScene'
 
-interface Props {
-  /** A new object restarts the scene with that battle. */
-  battle: BattleSceneData | null
-}
-
-/** Mounts the Phaser canvas; React UI is layered around and on top of it. */
 /** `?renderer=canvas` forces the Canvas renderer, to rule out WebGL problems on a device. */
 function rendererType() {
   const choice = new URLSearchParams(window.location.search).get('renderer')
@@ -17,35 +11,41 @@ function rendererType() {
   return Phaser.AUTO
 }
 
-export function PhaserGame({ battle }: Props) {
+/**
+ * Mounts the Phaser canvas for one battle. The parent remounts it (via `key`) when the orientation flips;
+ * `battle.startAt` then fast-forwards to where playback was.
+ */
+export function PhaserGame({ battle, orientation }: { battle: BattleSceneData; orientation: Orientation }) {
   const containerRef = useRef<HTMLDivElement>(null)
-  const gameRef = useRef<Phaser.Game | null>(null)
+  // The scene reads the latest data when it starts; later prop changes are not needed.
+  const battleRef = useRef(battle)
 
   useEffect(() => {
+    const rect = containerRef.current!.getBoundingClientRect()
+    const { width, height } = canvasSize(orientation, rect.width / Math.max(1, rect.height))
     const game = new Phaser.Game({
       type: rendererType(),
       parent: containerRef.current!,
-      backgroundColor: '#0f1117',
-      // Creature art is 512x512 (power of two), so mipmaps keep it smooth when shrunk into the grid.
+      backgroundColor: '#0a0918',
       render: { mipmapFilter: 'LINEAR_MIPMAP_LINEAR' },
-      scale: { mode: Phaser.Scale.FIT, autoCenter: Phaser.Scale.CENTER_BOTH, width: 1280, height: 720 },
+      scale: { mode: Phaser.Scale.FIT, autoCenter: Phaser.Scale.CENTER_BOTH, width, height },
     })
-    game.scene.add('BattleScene', BattleScene)
+    let destroyed = false
     game.events.once(Phaser.Core.Events.READY, () => {
-      game.canvas.addEventListener('webglcontextlost', () =>
-        reportProblem('WebGL context lost. Try again with ?renderer=canvas in the address.'),
-      )
+      game.canvas.addEventListener('webglcontextlost', () => reportProblem('WebGL context lost. Try again with ?renderer=canvas in the address.'))
+      // Wait for the web fonts so the canvas text uses Cinzel instead of a fallback.
+      const fonts = document.fonts
+        ? Promise.all([document.fonts.load('bold 20px Cinzel'), document.fonts.load('20px Cinzel'), document.fonts.load('bold 14px "Alegreya Sans"'), document.fonts.load('14px "Alegreya Sans"')]).catch(() => undefined)
+        : Promise.resolve()
+      void fonts.then(() => {
+        if (!destroyed) game.scene.add('BattleScene', BattleScene, true, battleRef.current)
+      })
     })
-    gameRef.current = game
     return () => {
+      destroyed = true
       game.destroy(true)
-      gameRef.current = null
     }
-  }, [])
-
-  useEffect(() => {
-    gameRef.current?.scene.start('BattleScene', battle ?? {})
-  }, [battle])
+  }, [orientation])
 
   return <div ref={containerRef} className="absolute inset-0" />
 }

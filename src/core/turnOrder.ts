@@ -1,13 +1,13 @@
 import { RULES } from './rules'
-import { isAlive, type Unit } from './unit'
+import { effectiveStat, isAlive, type Unit } from './unit'
 
-export const actionDelay = (unit: Unit) => Math.round(RULES.turnScale / unit.creature.stats.swiftness)
+export const actionDelay = (unit: Unit) => Math.round(RULES.turnScale / effectiveStat(unit, 'swiftness'))
 
 /** Earlier time first; ties go to higher Swiftness, then the player side, then team order. */
 function compare(a: Unit, aAt: number, b: Unit, bAt: number): number {
   return (
     aAt - bAt ||
-    b.creature.stats.swiftness - a.creature.stats.swiftness ||
+    b.stats.swiftness - a.stats.swiftness ||
     (a.side === b.side ? 0 : a.side === 'player' ? -1 : 1) ||
     a.index - b.index
   )

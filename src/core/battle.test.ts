@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { runBattle } from './battle'
 import { formatBattleLog } from './log'
 import { RULES } from './rules'
+import { STATUS_NUMBERS } from './statuses'
 import type { BattleEvent, Content, CreatureDef, SkillDef, Stats, Team, TeamMember } from './types'
 
 const stats = (overrides: Partial<Stats> = {}): Stats => ({
@@ -145,7 +146,7 @@ describe('runBattle', () => {
     const result = runBattle({ player: team(member('fast', 1, 'front', tactics)), enemy: team(member('a', 1, 'front')), seed: 1 }, c)
     expect(ofType(result.events, 'statusApplied')[0]).toMatchObject({ target: 'enemy-0', status: 'burn', turns: 2 })
     const ticks = ofType(result.events, 'statusTicked')
-    expect(ticks[0]).toMatchObject({ unit: 'enemy-0', amount: Math.round(500 * RULES.burnPercent) })
+    expect(ticks[0]).toMatchObject({ unit: 'enemy-0', amount: Math.round(500 * STATUS_NUMBERS.burnPercent) })
     expect(ofType(result.events, 'statusExpired').length).toBeGreaterThan(0)
   })
 
@@ -156,7 +157,7 @@ describe('runBattle', () => {
   })
 
   it('rejects invalid teams', () => {
-    const tooMany = Array.from({ length: RULES.tacticSlots + 1 }, () => ({ condition: { type: 'always' as const }, skill: 'strike', target: 'sameLane' as const }))
+    const tooMany = Array.from({ length: RULES.maxTacticSlots + 1 }, () => ({ condition: { type: 'always' as const }, skill: 'strike', target: 'sameLane' as const }))
     expect(() => runBattle({ player: team(member('a', 1, 'front', tooMany)), enemy: team(member('b', 1, 'front')), seed: 1 }, c)).toThrow(/Tactics/)
     expect(() => runBattle({ player: team(member('a', 1, 'front'), member('a', 1, 'front')), enemy: team(member('b', 1, 'front')), seed: 1 }, c)).toThrow(/Two creatures/)
     expect(() => runBattle({ player: team(member('nope', 1, 'front')), enemy: team(member('b', 1, 'front')), seed: 1 }, c)).toThrow(/Unknown creature/)
