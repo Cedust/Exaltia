@@ -4,14 +4,21 @@ import { hasStatus, isAlive, lifeforceRatio, type Unit } from './unit'
 
 /** Units a skill may pick as its primary target, before the Target Priority chooses one. */
 export function candidates(skill: SkillDef, actor: Unit, units: Unit[]): Unit[] {
+  // Buffs never target someone who already has their status, so "Always → Taunt" recasts only when it runs out.
+  const lacksBuff = (u: Unit) => skill.effect !== 'buff' || !skill.inflicts || !hasStatus(u, skill.inflicts.status)
+  if (skill.selfOnly) return isAlive(actor) && lacksBuff(actor) ? [actor] : []
+  if (skill.revive) return units.filter((u) => u.side === actor.side && !isAlive(u))
   if (skill.effect === 'heal') {
     return units.filter((u) => u.side === actor.side && isAlive(u) && lifeforceRatio(u) < 1)
   }
+  if (skill.effect === 'buff') return units.filter((u) => u.side === actor.side && isAlive(u) && lacksBuff(u))
   const enemies = units.filter((u) => u.side !== actor.side && isAlive(u))
-  if (skill.ignoresProtection) return enemies
   // The Back Row is protected while anyone stands in the Front Row.
   const front = enemies.filter((u) => u.position.row === 'front')
-  return front.length > 0 ? front : enemies
+  const reachable = skill.ignoresProtection || front.length === 0 ? enemies : front
+  // Taunt: attacks must aim at a taunting creature when they can reach one.
+  const taunting = reachable.filter((u) => hasStatus(u, 'taunt'))
+  return taunting.length > 0 ? taunting : reachable
 }
 
 /**
@@ -27,8 +34,12 @@ export function conditionFilter(condition: Condition, skill: SkillDef): (unit: U
       return (u) => !damage || !hasStatus(u, condition.status)
     case 'enemyHasStatus':
       return (u) => !damage || hasStatus(u, condition.status)
+    case 'enemyLifeforceBelow':
+      return (u) => !damage || lifeforceRatio(u) * 100 < condition.percent
     case 'allyLifeforceBelow':
       return (u) => damage || lifeforceRatio(u) * 100 < condition.percent
+    case 'allyWithoutStatus':
+      return (u) => damage || !hasStatus(u, condition.status)
     default:
       return () => true
   }
@@ -44,9 +55,11 @@ function score(priority: TargetPriority, unit: Unit, actor: Unit, skill: SkillDe
     case 'highestLifeforce':
       return -lifeforceRatio(unit)
     case 'highestMight':
-      return -unit.creature.stats.might
+      return -unit.stats.might
     case 'highestResonance':
-      return -unit.creature.stats.resonance
+      return -unit.stats.resonance
+    case 'highestSwiftness':
+      return -unit.stats.swiftness
     case 'weakToSkill':
       return (isWeakTo(unit.creature.element, skill.element) ? 0 : 1) + lifeforceRatio(unit) / 2
     case 'sameLane':
@@ -64,14 +77,18 @@ export function selectTargets(
   units: Unit[],
   allowed: (unit: Unit) => boolean = () => true,
 ): Unit[] {
+  // Self only makes sense for skills that may target allies; for attacks it falls back to the nearest Lane.
+  const effective = priority === 'self' && skill.effect === 'damage' ? 'sameLane' : priority
   const pool = candidates(skill, actor, units)
     .filter(allowed)
-    .map((unit) => ({ unit, score: score(priority, unit, actor, skill) }))
+    .map((unit) => ({ unit, score: score(effective, unit, actor, skill) }))
     .filter((c) => c.score !== Infinity)
     .sort((a, b) => a.score - b.score || byPosition(a.unit, b.unit))
   const primary = pool[0]?.unit
   if (!primary) return []
+  if (skill.selfOnly) return [primary]
 
+  if (skill.revive) return [primary]
   const side = units.filter((u) => u.side === primary.side && isAlive(u))
   switch (skill.pattern) {
     case 'single':

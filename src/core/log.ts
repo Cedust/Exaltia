@@ -1,4 +1,5 @@
-import type { BattleEvent, Condition, Element, StatusId, TargetPriority, UnitSnapshot } from './types'
+import { statusName } from './statuses'
+import type { BattleEvent, Condition, Element, TargetPriority, UnitSnapshot } from './types'
 
 const ELEMENT_NAMES: Record<Element, string> = {
   fire: 'Fire',
@@ -12,10 +13,8 @@ const ELEMENT_NAMES: Record<Element, string> = {
   physical: 'Physical',
 }
 
-const STATUS_NAMES: Record<StatusId, string> = { burn: 'Burn' }
-
 export const elementName = (element: Element) => ELEMENT_NAMES[element]
-export const statusName = (status: StatusId) => STATUS_NAMES[status]
+export { statusName }
 
 export function describeCondition(condition: Condition): string {
   switch (condition.type) {
@@ -27,6 +26,10 @@ export function describeCondition(condition: Condition): string {
       return `Ally Lifeforce < ${condition.percent}%`
     case 'selfLifeforceBelow':
       return `Self Lifeforce < ${condition.percent}%`
+    case 'enemyLifeforceBelow':
+      return `Enemy Lifeforce < ${condition.percent}%`
+    case 'allyWithoutStatus':
+      return `Ally without ${statusName(condition.status)}`
     case 'selfEssenceAtLeast':
       return `Self Essence ≥ ${condition.amount}`
     case 'enemyWithoutStatus':
@@ -43,6 +46,7 @@ const TARGET_NAMES: Record<TargetPriority, string> = {
   highestLifeforce: 'Highest Lifeforce %',
   highestMight: 'Highest Might',
   highestResonance: 'Highest Resonance',
+  highestSwiftness: 'Highest Swiftness',
   weakToSkill: 'Weak to Skill Element',
   sameLane: 'Same Lane',
   self: 'Self',
@@ -79,14 +83,33 @@ export function formatBattleLog(events: BattleEvent[]): BattleLogLine[] {
         push(`— Turn ${event.turn}: ${name(event.actor)} (ESS ${event.essence})`)
         break
       case 'statusTicked':
-        push(`  ${name(event.unit)} suffers ${event.amount} from ${statusName(event.status)} · ${lifeforce(event.unit, event.lifeforce)}`)
+        push(
+          event.heal
+            ? `  ${name(event.unit)} recovers ${event.amount} from ${statusName(event.status)} · ${lifeforce(event.unit, event.lifeforce)}`
+            : `  ${name(event.unit)} suffers ${event.amount} from ${statusName(event.status)} · ${lifeforce(event.unit, event.lifeforce)}`,
+        )
+        break
+      case 'turnLost':
+        push(`  ${name(event.unit)} is paralysed by ${statusName(event.status)} and loses the turn`)
+        break
+      case 'surge':
+        push(`The arena's Sigils surge! From now on damage rises and healing fades with every turn.`)
+        break
+      case 'phaseShift':
+        push(`  ${name(event.unit)}'s Sigil blazes: a new phase begins!`)
+        break
+      case 'lastStand':
+        push(`  ${name(event.unit)} refuses to fall and holds on with 1 Lifeforce!`)
+        break
+      case 'ascensionGauge':
         break
       case 'statusExpired':
         push(`  ${statusName(event.status)} wears off ${name(event.unit)}`)
         break
       case 'actionChosen': {
-        const reason =
-          event.tactic === null
+        const reason = event.ascension
+          ? 'ASCENSION'
+          : event.tactic === null
             ? 'Fallback: no Tactic matched'
             : `Tactic ${event.tactic + 1}: ${describeCondition(event.condition!)}`
         push(`  ${name(event.actor)} → ${event.skillName} → ${event.targets.map(name).join(', ')} · ${reason}`)
@@ -102,6 +125,9 @@ export function formatBattleLog(events: BattleEvent[]): BattleLogLine[] {
         break
       case 'statusApplied':
         push(`  ${name(event.target)} is afflicted with ${statusName(event.status)} (${event.turns} turns)`)
+        break
+      case 'revived':
+        push(`  ${name(event.target)} rises again · ${lifeforce(event.target, event.lifeforce)}`)
         break
       case 'defeated':
         push(`  ${name(event.unit)} is defeated!`)
