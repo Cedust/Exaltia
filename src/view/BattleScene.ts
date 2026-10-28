@@ -510,6 +510,11 @@ export class BattleScene extends Phaser.Scene {
         this.centerTitle('THE SIGILS SURGE', 'Damage rises, healing fades', '#ffb36b')
         return DURATION.surge
       }
+      case 'vowTriggered': {
+        const view = this.views.get(event.unit)!
+        if (!instant) this.float(view, event.vow, '#d9b8ff', -30, 17)
+        return DURATION.status
+      }
       case 'lastStand': {
         const view = this.views.get(event.unit)!
         if (!instant) this.float(view, 'Last Stand!', '#ffe7ad', -30, 20)

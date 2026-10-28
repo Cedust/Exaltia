@@ -3,7 +3,7 @@ import { RULES, isWeakTo } from './rules'
 import { STATUS_NUMBERS } from './statuses'
 import { chooseAction } from './tactics'
 import { actionDelay, nextActor, previewTurnOrder } from './turnOrder'
-import type { BattleEvent, BattleResult, BattleSetup, Content, Side, SkillDef, StatusId, Team, TeamMember } from './types'
+import type { BattleEvent, BattleResult, BattleSetup, Content, Passive, Side, SkillDef, StatusId, Team, TeamMember } from './types'
 import { effectiveStat, hasStatus, isAlive, lifeforceRatio, passiveSum, snapshot, type Unit } from './unit'
 
 /** Skills a team member may put into its Tactics. */
@@ -64,11 +64,17 @@ function createUnits(setup: BattleSetup, content: Content): Unit[] {
         ascension: 0,
         statuses: [],
         lastStandUsed: false,
+        attackBonus: 0,
+        firstHitUsed: false,
+        vigilUsed: false,
         nextAt: 0,
       }
       unit.essence = Math.min(stats.essence, Math.round(stats.essence * RULES.startingEssenceRatio) + passiveSum(unit, 'startEssence'))
       for (const p of passives) if (p.type === 'startStatus') unit.statuses.push({ id: p.status, turnsLeft: p.turns })
-      unit.nextAt = actionDelay(unit)
+      const startLifeforce = passives.flatMap((p) => (p.type === 'startLifeforce' ? [p.percent] : []))
+      if (startLifeforce.length) unit.lifeforce = Math.max(1, Math.round((stats.lifeforce * Math.min(...startLifeforce)) / 100))
+      if (unit.ascensionSkill && passiveSum(unit, 'startAscension') > 0) unit.ascension = RULES.ascensionMax
+      unit.nextAt = passiveSum(unit, 'actFirst') > 0 ? 0 : actionDelay(unit)
       units.push(unit)
     })
   }
@@ -77,7 +83,7 @@ function createUnits(setup: BattleSetup, content: Content): Unit[] {
 
 const roll = (rng: Rng) => 1 - RULES.variance + rng() * 2 * RULES.variance
 
-function damage(skill: SkillDef, source: Unit, target: Unit, rng: Rng, surge: number) {
+function damage(skill: SkillDef, source: Unit, target: Unit, rng: Rng, surge: number, extraPercent = 0) {
   const attack = effectiveStat(source, skill.stat)
   const defense = skill.piercesDefense ? 0 : effectiveStat(target, skill.stat === 'might' ? 'guard' : 'ward')
   const weakness = isWeakTo(target.creature.element, skill.element)
@@ -88,6 +94,7 @@ function damage(skill: SkillDef, source: Unit, target: Unit, rng: Rng, surge: nu
   let bonus = passiveSum(source, 'bonusVsStatus', (p) => hasStatus(target, p.status))
   if (skill.bonusVsStatus && hasStatus(target, skill.bonusVsStatus.status)) bonus += skill.bonusVsStatus.percent
   multiplier *= 1 + bonus / 100
+  multiplier *= 1 + (passiveSum(source, 'damageDealt') + source.attackBonus + extraPercent) / 100
   if (hasStatus(target, 'barrier')) multiplier *= STATUS_NUMBERS.barrierDamage
   multiplier *= Math.max(0.2, 1 + passiveSum(target, 'damageTaken') / 100)
   multiplier *= 1 + surge * RULES.surgeDamagePerTurn
@@ -104,6 +111,22 @@ export function runBattle(setup: BattleSetup, content: Content): BattleResult {
   const units = createUnits(setup, content)
   const events: BattleEvent[] = [{ type: 'battleStarted', units: units.map(snapshot) }]
 
+  /** The Vow behind a passive of this type on a unit, if it has one. */
+  const vowOf = <T extends Passive['type']>(unit: Unit, type: T) =>
+    unit.passives.find((p): p is Extract<Passive, { type: T }> => p.type === type)
+  const announce = (unit: Unit, vow: string) => events.push({ type: 'vowTriggered', unit: unit.id, vow })
+  const aliveOn = (side: Side) => units.filter((u) => u.side === side && isAlive(u))
+  const undyingUsed: Record<Side, boolean> = { player: false, enemy: false }
+  for (const unit of units) {
+    const dawn = vowOf(unit, 'startAscension')
+    if (dawn && unit.ascensionSkill) {
+      announce(unit, dawn.label)
+      events.push({ type: 'ascensionGauge', unit: unit.id, value: RULES.ascensionMax })
+    }
+    const first = vowOf(unit, 'actFirst')
+    if (first) announce(unit, first.label)
+  }
+
   const gainAscension = (unit: Unit, amount: number) => {
     if (!unit.ascensionSkill || !isAlive(unit) || unit.ascension >= RULES.ascensionMax) return
     const before = Math.floor(unit.ascension)
@@ -111,9 +134,46 @@ export function runBattle(setup: BattleSetup, content: Content): BattleResult {
     if (Math.floor(unit.ascension) !== before) events.push({ type: 'ascensionGauge', unit: unit.id, value: Math.floor(unit.ascension) })
   }
   const defeat = (unit: Unit) => {
+    const burning = hasStatus(unit, 'burn')
     unit.statuses = []
     events.push({ type: 'defeated', unit: unit.id })
     for (const ally of units) if (ally.side === unit.side && ally !== unit) gainAscension(ally, RULES.ascensionPerFallenAlly)
+    for (const ally of aliveOn(unit.side)) {
+      const avenger = vowOf(ally, 'avenger')
+      if (!avenger) continue
+      ally.attackBonus += avenger.percent
+      announce(ally, avenger.label)
+    }
+    const burst = vowOf(unit, 'onFaintBurst')
+    if (burst) {
+      announce(unit, burst.label)
+      const amount = Math.round((unit.stats.lifeforce * burst.percent) / 100)
+      for (const enemy of aliveOn(unit.side === 'player' ? 'enemy' : 'player')) hurt(unit, enemy, amount)
+    }
+    if (burning) {
+      const spreader = units.find((u) => u.side !== unit.side && isAlive(u) && vowOf(u, 'burnSpread'))
+      const next = aliveOn(unit.side).sort((a, b) => lifeforceRatio(a) - lifeforceRatio(b))[0]
+      if (spreader && next) {
+        const spread = vowOf(spreader, 'burnSpread')!
+        announce(spreader, spread.label)
+        applyStatus(next, 'burn', spread.turns)
+      }
+    }
+    const holder = undyingUsed[unit.side] ? undefined : units.find((u) => u.side === unit.side && vowOf(u, 'undying'))
+    if (holder && !isAlive(unit)) {
+      const undying = vowOf(holder, 'undying')!
+      undyingUsed[unit.side] = true
+      unit.lifeforce = Math.max(1, Math.round((unit.stats.lifeforce * undying.percent) / 100))
+      announce(unit, undying.label)
+      events.push({ type: 'revived', source: holder.id, target: unit.id, lifeforce: unit.lifeforce })
+    }
+  }
+  /** Direct damage from a Vow (bursts, splashes): no attack roll, no Weakness. */
+  const hurt = (source: Unit, target: Unit, amount: number) => {
+    if (!isAlive(target)) return
+    const taken = loseLifeforce(target, amount)
+    events.push({ type: 'damageDealt', source: source.id, target: target.id, amount: taken, weakness: false, lifeforce: target.lifeforce })
+    if (!isAlive(target)) defeat(target)
   }
   /** Lowers Lifeforce; Last Stand keeps a creature at 1 once per battle. Returns the damage actually taken. */
   const loseLifeforce = (unit: Unit, amount: number) => {
@@ -127,9 +187,20 @@ export function runBattle(setup: BattleSetup, content: Content): BattleResult {
     const taken = Math.min(unit.lifeforce, amount)
     unit.lifeforce -= taken
     gainAscension(unit, (taken / unit.stats.lifeforce) * RULES.ascensionPerLifeforceLost)
+    const vigil = vowOf(unit, 'lowLifeBarrier')
+    if (vigil && !unit.vigilUsed && isAlive(unit) && lifeforceRatio(unit) < 0.5) {
+      unit.vigilUsed = true
+      announce(unit, vigil.label)
+      applyStatus(unit, 'barrier', vigil.turns)
+    }
     return taken
   }
   const applyStatus = (target: Unit, status: StatusId, turns: number) => {
+    const immune = target.passives.find((p) => p.type === 'immune' && p.status === status)
+    if (immune && immune.type === 'immune') {
+      announce(target, immune.label)
+      return
+    }
     const existing = target.statuses.find((s) => s.id === status)
     if (existing) existing.turnsLeft = Math.max(existing.turnsLeft, turns)
     else target.statuses.push({ id: status, turnsLeft: turns })
@@ -221,6 +292,11 @@ export function runBattle(setup: BattleSetup, content: Content): BattleResult {
     })
 
     const extraTurns = passiveSum(actor, 'statusDuration')
+    const firstHit = actor.firstHitUsed ? undefined : vowOf(actor, 'firstHit')
+    const steam = vowOf(actor, 'steamBurst')
+    const splash = skill.pattern === 'single' ? vowOf(actor, 'splash') : undefined
+    const shatter = vowOf(actor, 'shatterBarrier')
+    if (firstHit && skill.effect === 'damage') announce(actor, firstHit.label)
     for (const target of targets) {
       if (skill.revive) {
         if (isAlive(target)) continue
@@ -243,19 +319,37 @@ export function runBattle(setup: BattleSetup, content: Content): BattleResult {
         if (skill.inflicts) applyStatus(target, skill.inflicts.status, skill.inflicts.turns + extraTurns)
         continue
       }
-      const hit = damage(skill, actor, target, rng, surge())
+      if (shatter && hasStatus(target, 'barrier')) {
+        target.statuses = target.statuses.filter((s) => s.id !== 'barrier')
+        events.push({ type: 'statusExpired', unit: target.id, status: 'barrier' })
+        announce(actor, shatter.label)
+      }
+      const steamReady =
+        !!steam && ((skill.element === 'fire' && hasStatus(target, 'chill')) || (skill.element === 'ice' && hasStatus(target, 'burn')))
+      const hit = damage(skill, actor, target, rng, surge(), firstHit?.percent ?? 0)
       const taken = loseLifeforce(target, hit.amount)
       events.push({ type: 'damageDealt', source: actor.id, target: target.id, amount: taken, weakness: hit.weakness, lifeforce: target.lifeforce })
       gainAscension(actor, RULES.ascensionPerHit)
       if (skill.drain && isAlive(actor)) heal(actor, actor, Math.round(taken * skill.drain))
-      if (!isAlive(target)) {
-        defeat(target)
-        continue
-      }
-      if (skill.inflicts && rng() < skill.inflicts.chance) {
+      if (!isAlive(target)) defeat(target)
+      else if (skill.inflicts && rng() < skill.inflicts.chance) {
         applyStatus(target, skill.inflicts.status, skill.inflicts.turns + extraTurns)
       }
+      if (steamReady && taken > 0) {
+        announce(actor, steam.label)
+        for (const other of aliveOn(target.side)) if (other !== target) hurt(actor, other, Math.round((taken * steam.percent) / 100))
+      }
+      if (splash && taken > 0) {
+        const other = aliveOn(target.side)
+          .filter((u) => u !== target)
+          .sort((a, b) => lifeforceRatio(a) - lifeforceRatio(b))[0]
+        if (other) {
+          announce(actor, splash.label)
+          hurt(actor, other, Math.round((taken * splash.percent) / 100))
+        }
+      }
     }
+    if (firstHit && skill.effect === 'damage') actor.firstHitUsed = true
     if (skill.selfStatus && isAlive(actor)) applyStatus(actor, skill.selfStatus.status, skill.selfStatus.turns)
     if (skill.essenceGain) actor.essence = Math.min(actor.stats.essence, actor.essence + Math.round(actor.stats.essence * skill.essenceGain))
     checkPhases()

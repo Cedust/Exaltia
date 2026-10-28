@@ -28,6 +28,10 @@ export interface Unit {
   ascension: number
   statuses: ActiveStatus[]
   lastStandUsed: boolean
+  /** Vow state: extra damage in percent (Avenger), whether the first hit and Vigil were used. */
+  attackBonus: number
+  firstHitUsed: boolean
+  vigilUsed: boolean
   /** Time on the CTB clock at which this unit acts next. */
   nextAt: number
 }

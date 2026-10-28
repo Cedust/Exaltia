@@ -101,6 +101,9 @@ export function formatBattleLog(events: BattleEvent[]): BattleLogLine[] {
       case 'lastStand':
         push(`  ${name(event.unit)} refuses to fall and holds on with 1 Lifeforce!`)
         break
+      case 'vowTriggered':
+        push(`  Vow · ${event.vow} (${name(event.unit)})`)
+        break
       case 'ascensionGauge':
         break
       case 'statusExpired':
