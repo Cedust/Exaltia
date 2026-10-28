@@ -12,26 +12,33 @@ npm run dev        # local dev server
 npm test           # unit tests (Vitest)
 npm run lint       # oxlint
 npm run build      # type-check and production build to dist/
-npm run sim        # headless battle simulator (see below)
+npm run campaign   # headless campaign simulator for balancing (see below)
 ```
+
+## What's in the MVP
+
+The whole story campaign (Prologue, 8 regions with Tournaments and Challenges, Cassian's duels, the finale and two endings) plus Rematches as a small endgame. All design decisions and added content are documented in [docs/MVP.md](docs/MVP.md).
 
 ## Structure
 
 - `src/core/` battle simulation, pure TypeScript, no Phaser or React imports, deterministic via the seeded RNG
-- `src/view/` Phaser scenes that render the battle
-- `src/ui/` React menus layered over the canvas
+- `src/data/` content: creatures, skills, Skill Trees, regions and encounters, story
+- `src/game/` campaign rules: save, progression, loadouts, rewards, auto planner
+- `src/view/` the Phaser battle scene (portrait and landscape layouts)
+- `src/ui/` React screens
 
-## Battle simulator
+## Campaign simulator
 
-Runs battles without graphics, for balancing and for reading Battle Logs:
+Plays the story headless with a simple counter-picking player, for balancing:
 
 ```sh
-npm run sim                                              # every encounter, 1000 runs, preset "naive"
-npm run sim -- --encounter winter-court --preset golem-mender --runs 5000
-npm run sim -- --encounter frost-wardens --log --seed 7  # one battle with its full Battle Log
+npm run campaign                                  # First Trial for every starter pair, then the story in ring order
+npm run campaign -- --start fire --reverse --runs 200
 ```
 
-Content (creatures, skills, encounters, player presets) lives in `src/data/`.
+## Art
+
+`tools/prepare_art.py` converts the final art (creatures, characters, world map) into `public/art/`, including the blurred region backdrops cut from the world map.
 
 ## Deployment
 

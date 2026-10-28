@@ -1,7 +1,7 @@
 import Phaser from 'phaser'
-import { describeCondition, statusName } from '../core/log'
+import { describeCondition } from '../core/log'
+import { STATUS_RULES, statusName } from '../core/statuses'
 import type { BattleEvent, BattleResult, Element, Side, StatusId, UnitSnapshot } from '../core/types'
-import { CREATURES } from '../data/creatures'
 
 /** Playback settings shared with React: the controls change them while the scene reads them each step. */
 export class Playback {
@@ -25,89 +25,194 @@ export interface BattleSceneData {
   result?: BattleResult
   playback?: Playback
   onProgress?: (eventIndex: number) => void
+  /** Region backdrop key in public/art/backdrops. */
+  backdrop?: string
+  /** Events up to this index are shown instantly (after a rotation restarts the scene). */
+  startAt?: number
 }
 
-const LANES = 3
-const CELL_W = 160
-const CELL_H = 160
-const GAP = 12
-const GRID_TOP = 160
-const BAR_W = 120
-const TURN_SLOTS = 9
+export type Orientation = 'landscape' | 'portrait'
 
-// Column centers from left to right: player Back, player Front | enemy Front, enemy Back.
-const COLUMN_X: Record<Side, Record<'front' | 'back', number>> = {
-  player: { back: 230, front: 410 },
-  enemy: { front: 870, back: 1050 },
+interface Layout {
+  width: number
+  height: number
+  portrait: boolean
+  /** Size of the box a creature sprite is fitted into. */
+  sprite: number
+  turnY: number
+  bossY: number
+  pos: (side: Side, lane: number, row: 'front' | 'back') => { x: number; y: number }
 }
-const SIDE_COLOR: Record<Side, number> = { player: 0x2f6fd6, enemy: 0xe8642c }
-const ELEMENT_COLOR: Record<Element, string> = {
-  fire: '#e8642c',
-  ice: '#6fa8ff',
-  thunder: '#f2c94c',
-  water: '#2bb5a8',
-  earth: '#3f9d5a',
-  wind: '#cfe8e6',
-  radiance: '#f4e3b0',
-  umbra: '#9a86e0',
-  physical: '#c4c8cc',
+
+/** Canvas size for a container: a fixed short side, the long side follows the screen within limits. */
+export function canvasSize(orientation: Orientation, aspect: number) {
+  if (orientation === 'portrait') return { width: 720, height: Math.round(Phaser.Math.Clamp(720 / aspect, 1240, 1600)) }
+  return { width: Math.round(Phaser.Math.Clamp(720 * aspect, 1180, 1700)), height: 720 }
 }
+
+/** Positions for a canvas size. Portrait: enemies on top, Lanes as columns. Landscape: player left, enemies right. */
+export function makeLayout(width: number, height: number): Layout {
+  if (height > width) {
+    const dy = (height - 1280) / 2
+    return {
+      width,
+      height,
+      portrait: true,
+      sprite: 168,
+      turnY: 56,
+      bossY: 138,
+      pos: (side, lane, row) => ({
+        x: 130 + lane * 230,
+        y: dy + (side === 'enemy' ? (row === 'back' ? 310 : 560) : row === 'front' ? 850 : 1100),
+      }),
+    }
+  }
+  const dx = (width - 1280) / 2
+  return {
+    width,
+    height,
+    portrait: false,
+    sprite: 165,
+    turnY: 46,
+    bossY: 112,
+    pos: (side, lane, row) => ({
+      x: dx + (side === 'player' ? (row === 'front' ? 430 : 215) : row === 'front' ? 850 : 1065),
+      y: 290 + lane * 152,
+    }),
+  }
+}
+
+const SIDE_COLOR: Record<Side, number> = { player: 0x6fa8ff, enemy: 0xff7a5c }
+const ELEMENT_COLOR: Record<Element, number> = {
+  fire: 0xf07a3a,
+  ice: 0x5f9bff,
+  thunder: 0xf6d04d,
+  water: 0x36c9b8,
+  earth: 0x5dbb72,
+  wind: 0xd4f1ee,
+  radiance: 0xfbe7a8,
+  umbra: 0xa08af0,
+  physical: 0xd8d4e4,
+}
+const css = (color: number) => `#${color.toString(16).padStart(6, '0')}`
+const STATUS_COLOR: Record<StatusId, number> = {
+  burn: 0xff8a3d,
+  chill: 0x8fc3ff,
+  shock: 0xffe14d,
+  sunder: 0xc9a47a,
+  hex: 0xb58cff,
+  regen: 0x7cf29a,
+  haste: 0xbff7f0,
+  barrier: 0xfff1c9,
+  taunt: 0xff6b6b,
+}
+const GOLD = 0xe6c47a
 
 // Base durations in ms at 1x speed.
-const DURATION = { turn: 250, action: 550, hit: 450, status: 300, end: 0 }
+const DURATION = { turn: 220, action: 520, hit: 420, status: 280, ascension: 1300, phase: 900, surge: 1100 }
 
-const FONT = 'Inter, system-ui, Segoe UI, Roboto, sans-serif'
+const DISPLAY = 'Cinzel, Georgia, serif'
+const SANS = '"Alegreya Sans", system-ui, sans-serif'
+const RESOLUTION = Math.min(2, Math.max(1, Math.round(globalThis.devicePixelRatio || 1)))
 const style = (overrides: Phaser.Types.GameObjects.Text.TextStyle): Phaser.Types.GameObjects.Text.TextStyle => ({
-  fontFamily: FONT,
+  fontFamily: SANS,
+  resolution: RESOLUTION,
   ...overrides,
 })
 
-const laneY = (lane: number) => GRID_TOP + lane * (CELL_H + GAP) + CELL_H / 2
-const textureKey = (creature: string) => `creature-${creature}`
+export const textureKey = (creature: string) => `creature-${creature}`
 
 class UnitView {
   readonly container: Phaser.GameObjects.Container
-  private readonly sprite: Phaser.GameObjects.Image
+  readonly sprite: Phaser.GameObjects.Image
+  private readonly ring: Phaser.GameObjects.Graphics
+  private readonly glow: Phaser.GameObjects.Image
   private readonly lifeforceFill: Phaser.GameObjects.Rectangle
   private readonly essenceFill: Phaser.GameObjects.Rectangle
-  private readonly statusText: Phaser.GameObjects.Text
-  private readonly statuses = new Set<StatusId>()
+  private readonly ascensionFill?: Phaser.GameObjects.Rectangle
+  private readonly statusRow: Phaser.GameObjects.Container
+  private readonly statuses = new Map<StatusId, number>()
   private readonly scene: Phaser.Scene
+  private readonly barWidth: number
   readonly unit: UnitSnapshot
-  readonly cell: Phaser.GameObjects.Rectangle
+  readonly home: { x: number; y: number }
+  readonly size: number
+  private breathing?: Phaser.Tweens.Tween
 
-  constructor(scene: Phaser.Scene, unit: UnitSnapshot, cell: Phaser.GameObjects.Rectangle) {
+  constructor(scene: Phaser.Scene, unit: UnitSnapshot, layout: Layout) {
     this.scene = scene
     this.unit = unit
-    this.cell = cell
-    this.container = scene.add.container(cell.x, cell.y)
-    this.sprite = scene.add.image(0, -14, textureKey(unit.creature)).setFlipX(unit.side === 'enemy')
-    this.sprite.setScale(Math.min((CELL_W - 16) / this.sprite.width, (CELL_H - 50) / this.sprite.height))
+    this.home = layout.pos(unit.side, unit.position.lane, unit.position.row)
+    this.size = layout.sprite * (unit.boss ? 1.22 : 1)
+    const { x, y } = this.home
+    this.container = scene.add.container(x, y)
+    this.container.setDepth(y)
 
+    const element = ELEMENT_COLOR[unit.element]
+    const shadow = scene.add.ellipse(0, this.size * 0.42, this.size * 0.8, this.size * 0.2, 0x000000, 0.45)
+    this.glow = scene.add.image(0, this.size * 0.38, 'glow').setTint(element).setAlpha(0.55).setScale((this.size * 1.1) / 128, (this.size * 0.36) / 128)
+    this.glow.setBlendMode(Phaser.BlendModes.ADD)
+    this.ring = scene.add.graphics()
+    this.drawRing(false)
+
+    this.sprite = scene.add.image(0, this.size * 0.42, textureKey(unit.creature)).setOrigin(0.5, 1).setFlipX(unit.side === 'enemy')
+    this.sprite.setScale(Math.min(this.size / this.sprite.width, this.size / this.sprite.height))
+
+    this.barWidth = Math.round(this.size * 0.82)
+    const top = this.size * 0.5
     const name = scene.add
-      .text(0, CELL_H / 2 - 34, unit.name, style({ fontSize: '13px', color: ELEMENT_COLOR[unit.element], fontStyle: 'bold' }))
-      .setOrigin(0.5)
-    const bar = (y: number, h: number, color: number) => {
-      const bg = scene.add.rectangle(-BAR_W / 2, y, BAR_W, h, 0x000000, 0.6).setOrigin(0, 0.5)
-      const fill = scene.add.rectangle(-BAR_W / 2, y, BAR_W, h, color).setOrigin(0, 0.5)
+      .text(0, top + 4, unit.name, style({ fontFamily: DISPLAY, fontSize: unit.boss ? '17px' : '15px', color: css(element), fontStyle: 'bold', stroke: '#0a0918', strokeThickness: 4 }))
+      .setOrigin(0.5, 0)
+    const bar = (yy: number, h: number, color: number) => {
+      const bg = scene.add.rectangle(-this.barWidth / 2, yy, this.barWidth, h, 0x05040c, 0.85).setOrigin(0, 0.5).setStrokeStyle(1, 0xe6c47a, 0.35)
+      const fill = scene.add.rectangle(-this.barWidth / 2, yy, this.barWidth, h, color).setOrigin(0, 0.5)
       return [bg, fill] as const
     }
-    const [lifeforceBg, lifeforceFill] = bar(CELL_H / 2 - 19, 7, 0x4cc36a)
-    const [essenceBg, essenceFill] = bar(CELL_H / 2 - 10, 4, 0x5aa0ff)
+    const [lifeforceBg, lifeforceFill] = bar(top + 30, unit.boss ? 10 : 8, 0x5fd38a)
+    const [essenceBg, essenceFill] = bar(top + 40, 4, 0x6fa8ff)
     this.lifeforceFill = lifeforceFill
     this.essenceFill = essenceFill
-    this.statusText = scene.add
-      .text(CELL_W / 2 - 8, -CELL_H / 2 + 6, '', style({ fontSize: '11px', color: '#ff9c5a', fontStyle: 'bold' }))
-      .setOrigin(1, 0)
-
-    this.container.add([this.sprite, name, lifeforceBg, lifeforceFill, essenceBg, essenceFill, this.statusText])
+    const parts: Phaser.GameObjects.GameObject[] = [this.glow, shadow, this.ring, this.sprite, name, lifeforceBg, lifeforceFill, essenceBg, essenceFill]
+    if (unit.hasAscension) {
+      const [ascBg, ascFill] = bar(top + 47, 4, GOLD)
+      this.ascensionFill = ascFill
+      ascFill.setScale(0, 1)
+      parts.push(ascBg, ascFill)
+    }
+    this.statusRow = scene.add.container(0, -this.size * 0.62)
+    parts.push(this.statusRow)
+    this.container.add(parts)
     this.setLifeforce(unit.lifeforce, 0)
     this.setEssence(unit.essence, 0)
+    this.breathing = scene.tweens.add({
+      targets: this.sprite,
+      scaleY: this.sprite.scaleY * 1.025,
+      duration: 1600 + (unit.position.lane * 170),
+      yoyo: true,
+      repeat: -1,
+      ease: 'Sine.easeInOut',
+    })
+  }
+
+  private drawRing(active: boolean) {
+    const r = this.size * 0.42
+    this.ring.clear()
+    this.ring.lineStyle(active ? 3 : 1.5, active ? 0xffe7ad : SIDE_COLOR[this.unit.side], active ? 1 : 0.55)
+    this.ring.strokeEllipse(0, this.size * 0.42, r * 2, r * 0.55)
+    if (active) {
+      this.ring.lineStyle(1, 0xffe7ad, 0.5)
+      this.ring.strokeEllipse(0, this.size * 0.42, r * 2.3, r * 0.68)
+    }
+  }
+
+  setActive(active: boolean) {
+    this.drawRing(active)
+    this.glow.setAlpha(active ? 0.95 : 0.55)
   }
 
   setLifeforce(value: number, duration: number) {
     const ratio = Math.max(0, value / this.unit.maxLifeforce)
-    this.lifeforceFill.setFillStyle(ratio > 0.5 ? 0x4cc36a : ratio > 0.25 ? 0xe0b43c : 0xd9534f)
+    this.lifeforceFill.setFillStyle(ratio > 0.5 ? 0x5fd38a : ratio > 0.25 ? 0xe6c04a : 0xe0574f)
     this.tweenBar(this.lifeforceFill, ratio, duration)
   }
 
@@ -115,37 +220,68 @@ class UnitView {
     this.tweenBar(this.essenceFill, value / this.unit.maxEssence, duration)
   }
 
+  setAscension(value: number, duration: number) {
+    if (!this.ascensionFill) return
+    this.ascensionFill.setFillStyle(value >= 100 ? 0xfff1c9 : GOLD)
+    this.tweenBar(this.ascensionFill, value / 100, duration)
+  }
+
   private tweenBar(bar: Phaser.GameObjects.Rectangle, ratio: number, duration: number) {
     if (duration <= 0) bar.setScale(ratio, 1)
     else this.scene.tweens.add({ targets: bar, scaleX: ratio, duration })
   }
 
-  setStatus(status: StatusId, active: boolean) {
-    if (active) this.statuses.add(status)
-    else this.statuses.delete(status)
-    this.statusText.setText([...this.statuses].map(statusName).join(' '))
+  setStatus(status: StatusId, turns: number | null) {
+    if (turns === null) this.statuses.delete(status)
+    else this.statuses.set(status, turns)
+    this.statusRow.removeAll(true)
+    const list = [...this.statuses.keys()]
+    const w = 50
+    list.forEach((s, i) => {
+      const x = (i - (list.length - 1) / 2) * (w + 4)
+      const pill = this.scene.add.rectangle(x, 0, w, 18, 0x0a0918, 0.85).setStrokeStyle(1, STATUS_COLOR[s], 0.9)
+      const label = this.scene.add
+        .text(x, 0, statusName(s), style({ fontSize: '11px', color: css(STATUS_COLOR[s]), fontStyle: 'bold' }))
+        .setOrigin(0.5)
+      this.statusRow.add([pill, label])
+    })
   }
 
-  defeat() {
+  flash() {
+    this.sprite.setTint(0xffffff).setTintMode(Phaser.TintModes.FILL)
+    this.scene.time.delayedCall(90, () => this.sprite.setTint(0xffffff).setTintMode(Phaser.TintModes.MULTIPLY))
+  }
+
+  defeat(instant: boolean) {
     this.statuses.clear()
-    this.statusText.setText('')
-    this.sprite.setTint(0x444444)
-    this.container.setAlpha(0.35)
+    this.statusRow.removeAll(true)
+    this.breathing?.pause()
+    this.sprite.setTint(0x555566)
+    this.glow.setAlpha(0)
+    if (instant) this.container.setAlpha(0.3)
+    else this.scene.tweens.add({ targets: this.container, alpha: 0.3, duration: 500 })
   }
 
-  setActive(active: boolean) {
-    this.cell.setStrokeStyle(active ? 4 : 2, active ? 0xffe28a : SIDE_COLOR[this.unit.side], active ? 1 : 0.6)
+  revive(lifeforce: number) {
+    this.sprite.setTint(0xffffff)
+    this.breathing?.resume()
+    this.container.setAlpha(1)
+    this.glow.setAlpha(0.55)
+    this.setLifeforce(lifeforce, 300)
   }
 }
 
-/** Draws the Lane grid and replays a battle's event stream. It never decides anything itself. */
+/** Replays a battle's event stream with the region backdrop. It never decides anything itself. */
 export class BattleScene extends Phaser.Scene {
   private views = new Map<string, UnitView>()
-  private cells = new Map<string, Phaser.GameObjects.Rectangle>()
   private turnOrder?: Phaser.GameObjects.Container
+  private bossBars = new Map<string, { fill: Phaser.GameObjects.Rectangle; max: number }>()
   private playback = new Playback()
   private onProgress?: (eventIndex: number) => void
   private result?: BattleResult
+  private backdrop = 'spire'
+  private startAt = 0
+  private layout: Layout = makeLayout(1280, 720)
   private cancelled = false
 
   constructor() {
@@ -156,55 +292,109 @@ export class BattleScene extends Phaser.Scene {
     this.result = data.result
     this.playback = data.playback ?? new Playback()
     this.onProgress = data.onProgress
+    this.backdrop = data.backdrop ?? 'spire'
+    this.startAt = data.startAt ?? 0
     this.views = new Map()
-    this.cells = new Map()
+    this.bossBars = new Map()
     this.cancelled = false
+    this.layout = makeLayout(this.scale.width, this.scale.height)
   }
 
   preload() {
-    for (const id of Object.keys(CREATURES)) {
+    const start = this.result?.events[0]
+    const creatures = start?.type === 'battleStarted' ? [...new Set(start.units.map((u) => u.creature))] : []
+    for (const id of creatures) {
       if (!this.textures.exists(textureKey(id))) this.load.image(textureKey(id), `art/creatures/${id}.webp`)
     }
+    const backdropKey = `backdrop-${this.backdrop}`
+    if (!this.textures.exists(backdropKey)) this.load.image(backdropKey, `art/backdrops/${this.backdrop}.webp`)
   }
 
   create() {
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => (this.cancelled = true))
-    this.drawGrid()
-    this.turnOrder = this.add.container(0, 0)
+    this.makeTextures()
+    this.drawBackground()
+    this.turnOrder = this.add.container(0, 0).setDepth(2000)
     const start = this.result?.events[0]
     if (start?.type !== 'battleStarted') return
-    for (const unit of start.units) {
-      const cell = this.cells.get(`${unit.side}:${unit.position.lane}:${unit.position.row}`)!
-      this.views.set(unit.id, new UnitView(this, unit, cell))
-    }
+    for (const unit of start.units) this.views.set(unit.id, new UnitView(this, unit, this.layout))
+    this.drawBossBars(start.units.filter((u) => u.boss))
     void this.play(this.result!.events)
   }
 
-  private drawGrid() {
-    const label = (x: number, text: string) =>
-      this.add.text(x, GRID_TOP - 16, text, style({ fontSize: '13px', color: '#9aa0a6' })).setOrigin(0.5)
-    for (const side of ['player', 'enemy'] as const) {
-      for (const row of ['front', 'back'] as const) {
-        const x = COLUMN_X[side][row]
-        label(x, row === 'front' ? 'Front' : 'Back')
-        for (let lane = 0; lane < LANES; lane++) {
-          const cell = this.add
-            .rectangle(x, laneY(lane), CELL_W, CELL_H, 0xffffff, 0.03)
-            .setStrokeStyle(2, SIDE_COLOR[side], 0.6)
-          this.cells.set(`${side}:${lane}:${row}`, cell)
-        }
-      }
+  private makeTextures() {
+    if (this.textures.exists('glow')) return
+    const canvas = this.textures.createCanvas('glow', 128, 128)
+    if (!canvas) return
+    const ctx = canvas.getContext()
+    const gradient = ctx.createRadialGradient(64, 64, 0, 64, 64, 64)
+    gradient.addColorStop(0, 'rgba(255,255,255,1)')
+    gradient.addColorStop(0.35, 'rgba(255,255,255,0.45)')
+    gradient.addColorStop(1, 'rgba(255,255,255,0)')
+    ctx.fillStyle = gradient
+    ctx.fillRect(0, 0, 128, 128)
+    canvas.refresh()
+  }
+
+  private drawBackground() {
+    const { width, height, portrait } = this.layout
+    const key = `backdrop-${this.backdrop}`
+    if (this.textures.exists(key)) {
+      const bg = this.add.image(width / 2, height / 2, key)
+      bg.setScale(Math.max(width / bg.width, height / bg.height))
     }
-    for (let lane = 0; lane < LANES; lane++) {
-      this.add.text(640, laneY(lane), `Lane ${lane + 1}`, style({ fontSize: '12px', color: '#5c6370' })).setOrigin(0.5)
+    // Night veil, vignette and a band of light where the two sides meet.
+    this.add.rectangle(width / 2, height / 2, width, height, 0x0a0918, 0.35)
+    const veil = this.add.graphics()
+    veil.fillGradientStyle(0x0a0918, 0x0a0918, 0x0a0918, 0x0a0918, 0.85, 0.85, 0, 0)
+    veil.fillRect(0, 0, width, height * 0.22)
+    veil.fillGradientStyle(0x0a0918, 0x0a0918, 0x0a0918, 0x0a0918, 0, 0, 0.8, 0.8)
+    veil.fillRect(0, height * 0.82, width, height * 0.18)
+    const band = this.add.image(width / 2, portrait ? 680 : 450, 'glow').setTint(0xffe7ad).setAlpha(0.18)
+    band.setScale(portrait ? width / 80 : 2.2, portrait ? 1.1 : height / 90).setBlendMode(Phaser.BlendModes.ADD)
+    // Faint lane runes.
+    const g = this.add.graphics()
+    g.lineStyle(1, 0xe6c47a, 0.12)
+    for (let lane = 0; lane < 3; lane++) {
+      const a = this.layout.pos('player', lane, 'back')
+      const b = this.layout.pos('enemy', lane, 'back')
+      g.lineBetween(a.x, a.y + this.layout.sprite * 0.42, b.x, b.y + this.layout.sprite * 0.42)
     }
+    // Rising motes of light.
+    for (let i = 0; i < 18; i++) {
+      const mote = this.add.image(Phaser.Math.Between(0, width), Phaser.Math.Between(0, height), 'glow').setTint(0xffe7ad)
+      mote.setScale(0.05 + Math.random() * 0.06).setAlpha(0.6).setBlendMode(Phaser.BlendModes.ADD)
+      this.tweens.add({
+        targets: mote,
+        y: mote.y - height * 0.6,
+        x: mote.x + Phaser.Math.Between(-40, 40),
+        alpha: 0,
+        duration: 6000 + Math.random() * 6000,
+        repeat: -1,
+        delay: Math.random() * 4000,
+        onRepeat: () => mote.setPosition(Phaser.Math.Between(0, width), height + 10).setAlpha(0.6),
+      })
+    }
+  }
+
+  private drawBossBars(bosses: UnitSnapshot[]) {
+    const { width, bossY, portrait } = this.layout
+    bosses.forEach((boss, i) => {
+      const w = portrait ? width - 120 : 420
+      const x = portrait ? width / 2 : width / 2 + (i - (bosses.length - 1) / 2) * (w + 40)
+      const y = bossY + (portrait ? i * 44 : 0)
+      this.add.text(x - w / 2, y - 24, boss.name.toUpperCase(), style({ fontFamily: DISPLAY, fontSize: '15px', color: css(ELEMENT_COLOR[boss.element]), fontStyle: 'bold', stroke: '#0a0918', strokeThickness: 4 })).setDepth(2000)
+      this.add.rectangle(x, y + 6, w + 6, 16, 0x05040c, 0.9).setStrokeStyle(1.5, GOLD, 0.8).setDepth(2000)
+      const fill = this.add.rectangle(x - w / 2, y + 6, w, 10, 0xe0574f).setOrigin(0, 0.5).setDepth(2000)
+      this.bossBars.set(boss.id, { fill, max: boss.maxLifeforce })
+    })
   }
 
   private async play(events: BattleEvent[]) {
     for (let i = 1; i < events.length; i++) {
       if (this.cancelled) return
-      const instant = this.playback.skip
-      const duration = this.apply(events[i], instant)
+      const instant = this.playback.skip || i <= this.startAt
+      const duration = this.apply(events, i, instant)
       this.onProgress?.(i)
       if (!instant && duration > 0) await this.wait(duration / this.playback.speed)
     }
@@ -214,8 +404,17 @@ export class BattleScene extends Phaser.Scene {
     return new Promise<void>((resolve) => this.time.delayedCall(ms, resolve))
   }
 
+  private setBoss(unit: string, lifeforce: number, duration: number) {
+    const bar = this.bossBars.get(unit)
+    if (!bar) return
+    const ratio = Math.max(0, lifeforce / bar.max)
+    if (duration <= 0) bar.fill.setScale(ratio, 1)
+    else this.tweens.add({ targets: bar.fill, scaleX: ratio, duration })
+  }
+
   /** Shows one event and returns how long playback should pause after it (at 1x speed). */
-  private apply(event: BattleEvent, instant: boolean): number {
+  private apply(events: BattleEvent[], index: number, instant: boolean): number {
+    const event = events[index]
     const speed = this.playback.speed
     const animate = (ms: number) => (instant ? 0 : ms / speed)
     switch (event.type) {
@@ -224,109 +423,249 @@ export class BattleScene extends Phaser.Scene {
       case 'turnStarted': {
         for (const view of this.views.values()) view.setActive(view.unit.id === event.actor)
         this.views.get(event.actor)!.setEssence(event.essence, animate(200))
-        this.drawTurnOrder([event.actor, ...event.upcoming])
+        if (!instant || index === this.startAt) this.drawTurnOrder([event.actor, ...event.upcoming])
         return DURATION.turn
       }
       case 'statusTicked': {
         const view = this.views.get(event.unit)!
         view.setLifeforce(event.lifeforce, animate(250))
-        if (!instant) this.float(view, `-${event.amount}`, '#ff9c5a')
+        this.setBoss(event.unit, event.lifeforce, animate(250))
+        if (!instant) this.float(view, `${event.heal ? '+' : '-'}${event.amount}`, css(STATUS_COLOR[event.status]))
         return DURATION.status
       }
       case 'statusExpired':
-        this.views.get(event.unit)!.setStatus(event.status, false)
+        this.views.get(event.unit)!.setStatus(event.status, null)
         return 0
+      case 'turnLost': {
+        const view = this.views.get(event.unit)!
+        if (!instant) this.float(view, 'Paralysed!', css(STATUS_COLOR.shock), -20)
+        return DURATION.status
+      }
       case 'actionChosen': {
         const view = this.views.get(event.actor)!
         view.setEssence(event.essence, animate(200))
-        if (!instant) {
-          const reason = event.tactic === null ? 'Fallback' : `Tactic ${event.tactic + 1}: ${describeCondition(event.condition!)}`
-          this.banner(view, event.skillName, reason)
-          const direction = view.unit.side === 'player' ? 1 : -1
-          this.tweens.add({ targets: view.container, x: view.cell.x + direction * 28, duration: 130 / speed, yoyo: true })
+        if (instant) return 0
+        if (event.ascension) {
+          this.ascension(view, event.skillName)
+          return DURATION.ascension
+        }
+        const reason = event.tactic === null ? 'Basic Attack' : `Tactic ${event.tactic + 1} · ${describeCondition(event.condition!)}`
+        this.banner(view, event.skillName, reason)
+        const targets = event.targets.map((id) => this.views.get(id)!)
+        const enemyTargets = targets.filter((t) => t.unit.side !== view.unit.side)
+        if (enemyTargets.length > 0) {
+          const target = enemyTargets[0]
+          const dx = (target.home.x - view.home.x) * 0.12
+          const dy = (target.home.y - view.home.y) * 0.12
+          this.tweens.add({ targets: view.container, x: view.home.x + dx, y: view.home.y + dy, duration: 140 / speed, yoyo: true, ease: 'Quad.easeOut' })
+          for (const t of enemyTargets) this.projectile(view, t)
+        } else {
+          for (const t of targets) this.sparkle(t, 0xfff1c9)
         }
         return DURATION.action
       }
       case 'damageDealt': {
         const view = this.views.get(event.target)!
         view.setLifeforce(event.lifeforce, animate(300))
+        this.setBoss(event.target, event.lifeforce, animate(300))
         if (!instant) {
-          this.float(view, event.weakness ? `WEAK! -${event.amount}` : `-${event.amount}`, event.weakness ? '#ffd23f' : '#ffffff')
-          this.tweens.add({ targets: view.container, x: view.cell.x + 6, duration: 50 / speed, yoyo: true, repeat: 2 })
+          view.flash()
+          this.float(view, event.weakness ? `${event.amount}!` : `${event.amount}`, event.weakness ? '#ffd23f' : '#ffffff', 0, event.weakness ? 34 : 26)
+          if (event.weakness) this.float(view, 'WEAK', '#ffd23f', 34, 15)
+          this.tweens.add({ targets: view.container, x: view.home.x + 7, duration: 45 / speed, yoyo: true, repeat: 2, onComplete: () => view.container.setX(view.home.x) })
+          this.sparkle(view, 0xffffff)
+          if (event.weakness || view.unit.boss) this.cameras.main.shake(120, 0.004)
         }
         return DURATION.hit
       }
       case 'healed': {
         const view = this.views.get(event.target)!
         view.setLifeforce(event.lifeforce, animate(300))
-        if (!instant) this.float(view, `+${event.amount}`, '#7cf29a')
+        this.setBoss(event.target, event.lifeforce, animate(300))
+        if (!instant) {
+          this.float(view, `+${event.amount}`, '#7cf29a')
+          this.sparkle(view, 0x7cf29a)
+        }
         return DURATION.hit
       }
       case 'statusApplied': {
         const view = this.views.get(event.target)!
-        view.setStatus(event.status, true)
-        if (!instant) this.float(view, statusName(event.status), '#ff9c5a', 20)
+        view.setStatus(event.status, event.turns)
+        if (!instant) this.float(view, statusName(event.status), css(STATUS_COLOR[event.status]), 26, 17)
+        return STATUS_RULES[event.status].kind === 'buff' ? DURATION.status / 2 : DURATION.status
+      }
+      case 'ascensionGauge':
+        this.views.get(event.unit)?.setAscension(event.value, animate(200))
+        return 0
+      case 'phaseShift': {
+        const view = this.views.get(event.unit)!
+        if (instant) return 0
+        this.cameras.main.flash(300, 255, 200, 120)
+        this.float(view, 'SIGIL BLAZES', '#ffe7ad', -40, 22)
+        this.sparkle(view, GOLD, 16)
+        return DURATION.phase
+      }
+      case 'surge': {
+        if (instant) return 0
+        this.centerTitle('THE SIGILS SURGE', 'Damage rises, healing fades', '#ffb36b')
+        return DURATION.surge
+      }
+      case 'lastStand': {
+        const view = this.views.get(event.unit)!
+        if (!instant) this.float(view, 'Last Stand!', '#ffe7ad', -30, 20)
         return DURATION.status
       }
       case 'defeated':
-        this.views.get(event.unit)!.defeat()
+        this.views.get(event.unit)!.defeat(instant)
+        this.setBoss(event.unit, 0, 0)
         return DURATION.status
+      case 'revived': {
+        const view = this.views.get(event.target)!
+        view.revive(event.lifeforce)
+        if (!instant) {
+          this.float(view, 'Revived', '#fff1c9', -20, 20)
+          this.sparkle(view, 0xfff1c9, 14)
+        }
+        return DURATION.hit
+      }
       case 'battleEnded': {
         for (const view of this.views.values()) view.setActive(false)
-        const text = event.winner === 'draw' ? 'Draw' : event.winner === 'player' ? 'Victory' : 'Defeat'
-        const color = event.winner === 'player' ? '#ffe28a' : event.winner === 'enemy' ? '#ff7b72' : '#c4c8cc'
-        this.add
-          .text(640, 380, text, style({ fontSize: '72px', color, fontStyle: 'bold', stroke: '#000000', strokeThickness: 8 }))
-          .setOrigin(0.5)
-        return DURATION.end
+        const won = event.winner === 'player'
+        const text = event.winner === 'draw' ? 'DRAW' : won ? 'VICTORY' : 'DEFEAT'
+        this.centerTitle(text, '', won ? '#ffe7ad' : event.winner === 'enemy' ? '#ff8a7a' : '#d8d4e4', true)
+        return 0
       }
     }
   }
 
-  private float(view: UnitView, text: string, color: string, offsetY = 0) {
+  private float(view: UnitView, text: string, color: string, offsetY = 0, size = 24) {
     const label = this.add
-      .text(view.cell.x, view.cell.y - 30 + offsetY, text, style({
-        fontSize: '22px',
+      .text(view.home.x + Phaser.Math.Between(-10, 10), view.home.y - view.size * 0.25 - offsetY, text, style({
+        fontFamily: DISPLAY,
+        fontSize: `${size}px`,
         color,
         fontStyle: 'bold',
-        stroke: '#000000',
+        stroke: '#0a0918',
         strokeThickness: 5,
       }))
       .setOrigin(0.5)
+      .setDepth(3000)
     this.tweens.add({
       targets: label,
-      y: label.y - 40,
+      y: label.y - 46,
       alpha: 0,
-      duration: 900 / this.playback.speed,
+      duration: 1000 / this.playback.speed,
+      ease: 'Cubic.easeOut',
       onComplete: () => label.destroy(),
     })
   }
 
+  private sparkle(view: UnitView, color: number, count = 7) {
+    const cx = view.home.x
+    const cy = view.home.y
+    for (let i = 0; i < count; i++) {
+      const p = this.add.image(cx, cy, 'glow').setTint(color).setScale(0.12).setBlendMode(Phaser.BlendModes.ADD).setDepth(2500)
+      const angle = (i / count) * Math.PI * 2 + Math.random()
+      const dist = view.size * (0.3 + Math.random() * 0.25)
+      this.tweens.add({
+        targets: p,
+        x: cx + Math.cos(angle) * dist,
+        y: cy + Math.sin(angle) * dist * 0.7,
+        scale: 0.02,
+        alpha: 0,
+        duration: 450 / this.playback.speed,
+        onComplete: () => p.destroy(),
+      })
+    }
+  }
+
+  private projectile(from: UnitView, to: UnitView) {
+    const color = ELEMENT_COLOR[from.unit.element]
+    const orb = this.add.image(from.home.x, from.home.y - from.size * 0.1, 'glow').setTint(color).setScale(0.35).setBlendMode(Phaser.BlendModes.ADD).setDepth(2600)
+    this.tweens.add({
+      targets: orb,
+      x: to.home.x,
+      y: to.home.y - to.size * 0.1,
+      scale: 0.5,
+      duration: 220 / this.playback.speed,
+      ease: 'Quad.easeIn',
+      onComplete: () => {
+        this.tweens.add({ targets: orb, scale: 1.1, alpha: 0, duration: 180 / this.playback.speed, onComplete: () => orb.destroy() })
+      },
+    })
+  }
+
   private banner(view: UnitView, title: string, subtitle: string) {
-    const y = view.cell.y - CELL_H / 2 - 4
-    const group = this.add.container(view.cell.x, y, [
-      this.add.text(0, -14, title, style({ fontSize: '16px', color: '#ffffff', fontStyle: 'bold', stroke: '#000000', strokeThickness: 4 })).setOrigin(0.5),
-      this.add.text(0, 6, subtitle, style({ fontSize: '11px', color: '#c4c8cc', backgroundColor: '#000000aa', padding: { x: 4, y: 1 } })).setOrigin(0.5),
-    ])
-    group.setDepth(10)
-    this.tweens.add({ targets: group, alpha: 0, delay: 500 / this.playback.speed, duration: 300 / this.playback.speed, onComplete: () => group.destroy() })
+    const y = view.home.y - view.size * 0.62 - 26
+    const group = this.add.container(view.home.x, y)
+    const titleText = this.add
+      .text(0, -10, title, style({ fontFamily: DISPLAY, fontSize: '19px', color: '#fff3d1', fontStyle: 'bold', stroke: '#0a0918', strokeThickness: 5 }))
+      .setOrigin(0.5)
+    const sub = this.add.text(0, 12, subtitle, style({ fontSize: '13px', color: '#e6c47a', backgroundColor: '#0a0918cc', padding: { x: 6, y: 2 } })).setOrigin(0.5)
+    group.add([sub, titleText])
+    // Keep the banner inside the screen.
+    const half = Math.max(titleText.width, sub.width) / 2 + 8
+    group.setX(Phaser.Math.Clamp(view.home.x, half, this.layout.width - half))
+    group.setDepth(2800)
+    group.setAlpha(0)
+    this.tweens.add({ targets: group, alpha: 1, y: y - 6, duration: 120 / this.playback.speed })
+    this.tweens.add({ targets: group, alpha: 0, delay: 650 / this.playback.speed, duration: 280 / this.playback.speed, onComplete: () => group.destroy() })
+  }
+
+  private ascension(view: UnitView, skillName: string) {
+    const { width, height } = this.layout
+    const speed = this.playback.speed
+    const veil = this.add.rectangle(width / 2, height / 2, width, height, 0x05040c, 0).setDepth(2700)
+    this.tweens.add({ targets: veil, fillAlpha: 0.6, duration: 200 / speed, yoyo: true, hold: 700 / speed, onComplete: () => veil.destroy() })
+    const halo = this.add.image(view.home.x, view.home.y, 'glow').setTint(0xffe7ad).setScale(0.5).setAlpha(0).setBlendMode(Phaser.BlendModes.ADD).setDepth(2750)
+    this.tweens.add({ targets: halo, scale: 4, alpha: { from: 0.9, to: 0 }, duration: 1000 / speed, onComplete: () => halo.destroy() })
+    view.container.setDepth(2760)
+    this.tweens.add({ targets: view.container, scale: 1.15, duration: 250 / speed, yoyo: true, hold: 500 / speed, onComplete: () => view.container.setDepth(view.home.y) })
+    this.centerTitle('ASCENSION', skillName, '#ffe7ad')
+    this.time.delayedCall(800 / speed, () => {
+      this.cameras.main.flash(250, 255, 236, 190)
+      this.cameras.main.shake(260, 0.008)
+    })
+  }
+
+  private centerTitle(title: string, subtitle: string, color: string, stay = false) {
+    const { width, height } = this.layout
+    const speed = this.playback.speed
+    const group = this.add.container(width / 2, height / 2).setDepth(3500)
+    const glow = this.add.image(0, 0, 'glow').setTint(0xffe7ad).setScale(width / 160, 1.4).setAlpha(0.35).setBlendMode(Phaser.BlendModes.ADD)
+    const big = this.add
+      .text(0, -8, title, style({ fontFamily: DISPLAY, fontSize: stay ? '84px' : '58px', color, fontStyle: 'bold', stroke: '#0a0918', strokeThickness: 8 }))
+      .setOrigin(0.5)
+    const parts: Phaser.GameObjects.GameObject[] = [glow, big]
+    if (subtitle) {
+      parts.push(this.add.text(0, stay ? 54 : 42, subtitle, style({ fontFamily: DISPLAY, fontSize: '22px', color: '#fff3d1', stroke: '#0a0918', strokeThickness: 5 })).setOrigin(0.5))
+    }
+    group.add(parts)
+    group.setScale(0.8).setAlpha(0)
+    this.tweens.add({ targets: group, scale: 1, alpha: 1, duration: 260 / speed, ease: 'Back.easeOut' })
+    if (!stay) this.tweens.add({ targets: group, alpha: 0, delay: 900 / speed, duration: 300 / speed, onComplete: () => group.destroy() })
   }
 
   /** The visible Turn Order: current actor first, then the predicted next turns. */
   private drawTurnOrder(ids: string[]) {
-    this.turnOrder!.removeAll(true)
-    const size = 56
-    const startX = 640 - ((TURN_SLOTS - 1) * (size + 8)) / 2
-    this.turnOrder!.add(this.add.text(startX - size / 2, 22, 'Turn Order', style({ fontSize: '12px', color: '#9aa0a6' })))
-    ids.slice(0, TURN_SLOTS).forEach((id, i) => {
+    const container = this.turnOrder!
+    container.removeAll(true)
+    const { width, turnY, portrait } = this.layout
+    const slots = portrait ? 8 : 9
+    const size = 46
+    const gap = 8
+    const startX = width / 2 - ((slots - 1) * (size + gap)) / 2
+    ids.slice(0, slots).forEach((id, i) => {
       const unit = this.views.get(id)!.unit
-      const x = startX + i * (size + 8)
-      const slot = this.add
-        .rectangle(x, 80, size, size, 0x000000, 0.5)
-        .setStrokeStyle(i === 0 ? 3 : 2, i === 0 ? 0xffe28a : SIDE_COLOR[unit.side])
-      const image = this.add.image(x, 80, textureKey(unit.creature)).setFlipX(unit.side === 'enemy')
-      image.setScale(Math.min((size - 6) / image.width, (size - 6) / image.height))
-      this.turnOrder!.add([slot, image])
+      const x = startX + i * (size + gap) + (i === 0 ? -4 : 0)
+      const s = i === 0 ? size + 10 : size
+      const disc = this.add.circle(x, turnY, s / 2, 0x0a0918, 0.85).setStrokeStyle(i === 0 ? 3 : 2, i === 0 ? 0xffe7ad : SIDE_COLOR[unit.side])
+      const image = this.add.image(x, turnY + s * 0.36, textureKey(unit.creature)).setOrigin(0.5, 1).setFlipX(unit.side === 'enemy')
+      image.setScale(Math.min((s - 6) / image.width, (s - 6) / image.height))
+      container.add([disc, image])
     })
+    container.add(
+      this.add.text(startX - size / 2 - 4, turnY + size / 2 + 6, 'TURN ORDER', style({ fontFamily: DISPLAY, fontSize: '11px', color: '#e6c47a' })),
+    )
   }
 }
