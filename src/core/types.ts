@@ -100,6 +100,21 @@ export type Passive =
   | { type: 'damageTaken'; percent: number }
   | { type: 'lastStand' }
   | { type: 'startStatus'; status: StatusId; turns: number }
+  // Vows (src/game/vows.ts). `label` is the Vow's name, shown when it fires.
+  | { type: 'immune'; status: StatusId; label: string }
+  | { type: 'damageDealt'; percent: number }
+  | { type: 'startLifeforce'; percent: number }
+  | { type: 'startAscension'; label: string }
+  | { type: 'actFirst'; label: string }
+  | { type: 'firstHit'; percent: number; label: string }
+  | { type: 'onFaintBurst'; percent: number; label: string }
+  | { type: 'lowLifeBarrier'; turns: number; label: string }
+  | { type: 'avenger'; percent: number; label: string }
+  | { type: 'shatterBarrier'; label: string }
+  | { type: 'undying'; percent: number; label: string }
+  | { type: 'splash'; percent: number; label: string }
+  | { type: 'burnSpread'; turns: number; label: string }
+  | { type: 'steamBurst'; percent: number; label: string }
 
 export type Condition =
   | { type: 'always' }
@@ -211,6 +226,8 @@ export type BattleEvent =
   | { type: 'phaseShift'; unit: UnitId }
   | { type: 'surge'; turn: number }
   | { type: 'lastStand'; unit: UnitId }
+  /** A Vow on this creature fired (shown as a banner). */
+  | { type: 'vowTriggered'; unit: UnitId; vow: string }
   | { type: 'defeated'; unit: UnitId }
   | { type: 'revived'; source: UnitId; target: UnitId; lifeforce: number }
   | { type: 'battleEnded'; winner: Side | 'draw'; turns: number }

@@ -19,12 +19,15 @@ export function BattleScreen({
   speed,
   onSpeed,
   onDone,
+  doneLabel,
 }: {
   encounter: Encounter
   result: BattleResult
   speed: number
   onSpeed: (speed: number) => void
   onDone: () => void
+  /** Text of the button shown when playback ends. */
+  doneLabel?: string
 }) {
   // startAt: where a remounted scene (after a rotation) resumes playback.
   const [view, setView] = useState(() => ({ orientation: currentOrientation(), startAt: 0 }))
@@ -125,7 +128,7 @@ export function BattleScreen({
         {finished && (
           <div className="pointer-events-none absolute inset-x-0 bottom-0 z-30 flex justify-center pb-6 safe-bottom">
             <button type="button" className="btn-oath pointer-events-auto rise-in min-w-56" onClick={onDone}>
-              {won ? 'Claim your reward' : 'Continue'}
+              {doneLabel ?? (won ? 'Claim your reward' : 'Continue')}
             </button>
           </div>
         )}

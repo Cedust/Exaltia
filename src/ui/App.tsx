@@ -19,6 +19,7 @@ import { StarterScreen } from './screens/StarterScreen'
 import { NameScreen, StoryScreen } from './screens/StoryScreen'
 import { TitleScreen } from './screens/TitleScreen'
 import { TournamentScreen } from './screens/TournamentScreen'
+import { VowDuelScreen } from './screens/VowDuelScreen'
 
 /** Where to go after a battle (or when leaving the pre-battle screen). */
 type Return = { kind: 'hub' } | { kind: 'tournament'; regionId: string }
@@ -37,6 +38,7 @@ type Step =
   | { kind: 'choose'; regionId: string }
   | { kind: 'oath'; paragonId: string; memory: number }
   | { kind: 'ending' }
+  | { kind: 'vowDuel' }
 
 const newSeed = () => Math.floor(Math.random() * 1_000_000)
 const story = (scene: string): Step => ({ kind: 'story', scene })
@@ -165,6 +167,7 @@ export default function App() {
           <TitleScreen
             hasSave={hasSave}
             onNew={newJourney}
+            onDuel={() => play({ kind: 'vowDuel' })}
             onContinue={() => {
               const loaded = loadSave()
               if (!loaded) return newJourney()
@@ -289,6 +292,8 @@ export default function App() {
         return <ParagonChoiceScreen regionId={screen.regionId} onChoose={(p) => choose(screen.regionId, p)} />
       case 'oath':
         return <OathScreen paragonId={screen.paragonId} memoryIndex={screen.memory} onDone={advance} />
+      case 'vowDuel':
+        return <VowDuelScreen onExit={() => play({ kind: 'title' })} />
       case 'ending':
         return (
           <EndingChoiceScreen
