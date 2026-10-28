@@ -3,7 +3,8 @@ import { CONTENT } from '../data'
 import { PARAGON_IDS } from '../data/creatures'
 import { FIRST_TRIAL, REGIONS, REGION_BY_ID, neighbours, type Encounter } from '../data/world'
 import { DUELS } from './battles'
-import { CONDITION_UNLOCKS, SHARD_REWARDS, XP, awakeningOf, masteryOf } from './rules'
+import type { DuelMatch } from './duel'
+import { CHALLENGE_VOWS, SHARD_REWARDS, TRIAL_VOW, XP, awakeningOf, masteryOf } from './rules'
 import { newOwned, tournamentsWon, type SaveState } from './save'
 
 // ── Availability on the map ──
@@ -74,8 +75,11 @@ export interface BattleReport {
   won: boolean
   shards: number
   gains: CreatureGain[]
+  /** Rounds won and lost in the match. */
+  score: { player: number; enemy: number }
   recruited?: string
-  unlockedCondition?: string
+  /** A new Vow joins the player's pool. */
+  unlockedVow?: string
   /** A Tournament final was won: the player must now choose a Paragon. */
   chooseParagonIn?: string
   rematchReward?: string
@@ -86,29 +90,30 @@ function xpFor(encounter: Encounter, tier: number) {
   return Math.round((XP.base + XP.perTier * tier) * (XP.kind[encounter.kind] ?? 1))
 }
 
-export function applyBattle(save: SaveState, encounter: Encounter, result: BattleResult, tier: number): { save: SaveState; report: BattleReport } {
-  const won = result.winner === 'player'
-  const report: BattleReport = { won, shards: 0, gains: [] }
+/** Rewards for a finished match: XP once per match, Mastery for every skill used in any round. */
+export function applyMatch(save: SaveState, encounter: Encounter, match: DuelMatch, results: BattleResult[], tier: number): { save: SaveState; report: BattleReport } {
+  const won = match.wins.player > match.wins.enemy
+  const report: BattleReport = { won, shards: 0, gains: [], score: { ...match.wins } }
   const creatures = { ...save.creatures }
-
-  // Units of the player side, by unit id.
-  const start = result.events[0]
-  const playerUnits = new Map<string, string>()
-  if (start.type === 'battleStarted') for (const u of start.units) if (u.side === 'player') playerUnits.set(u.id, u.creature)
 
   // Mastery: every use of a skill (not the Basic Attack or Ascension) counts.
   const uses = new Map<string, Map<string, number>>()
-  for (const e of result.events) {
-    if (e.type !== 'actionChosen' || e.ascension || e.tactic === null) continue
-    const creature = playerUnits.get(e.actor)
-    if (!creature) continue
-    const perSkill = uses.get(creature) ?? new Map<string, number>()
-    perSkill.set(e.skill, (perSkill.get(e.skill) ?? 0) + 1)
-    uses.set(creature, perSkill)
+  for (const result of results) {
+    const start = result.events[0]
+    const playerUnits = new Map<string, string>()
+    if (start.type === 'battleStarted') for (const u of start.units) if (u.side === 'player') playerUnits.set(u.id, u.creature)
+    for (const e of result.events) {
+      if (e.type !== 'actionChosen' || e.ascension || e.tactic === null) continue
+      const creature = playerUnits.get(e.actor)
+      if (!creature) continue
+      const perSkill = uses.get(creature) ?? new Map<string, number>()
+      perSkill.set(e.skill, (perSkill.get(e.skill) ?? 0) + 1)
+      uses.set(creature, perSkill)
+    }
   }
 
   const baseXp = xpFor(encounter, tier) * (won ? 1 : XP.lossShare)
-  const participants = new Set(playerUnits.values())
+  const participants = new Set(match.player.map((m) => m.creature))
   for (const owned of Object.values(save.creatures)) {
     if (CONTENT.creatures[owned.id].kind !== 'paragon') continue
     const gained = Math.round(baseXp * (participants.has(owned.id) ? 1 : XP.benchShare))
@@ -128,11 +133,10 @@ export function applyBattle(save: SaveState, encounter: Encounter, result: Battl
   let next: SaveState = { ...save, creatures, stats: { battles: save.stats.battles + 1, wins: save.stats.wins + (won ? 1 : 0) } }
   if (!won) return { save: next, report }
 
-  const unlockNextCondition = () => {
-    const condition = CONDITION_UNLOCKS.find((c) => !next.conditions.includes(c))
-    if (condition) {
-      next = { ...next, conditions: [...next.conditions, condition] }
-      report.unlockedCondition = condition
+  const unlockVow = (vow: string | undefined) => {
+    if (vow && !next.vows.includes(vow)) {
+      next = { ...next, vows: [...next.vows, vow] }
+      report.unlockedVow = vow
     }
   }
 
@@ -141,7 +145,7 @@ export function applyBattle(save: SaveState, encounter: Encounter, result: Battl
       report.shards = SHARD_REWARDS.trial
       if (!next.firstTrialWon) {
         next = { ...next, firstTrialWon: true }
-        unlockNextCondition()
+        unlockVow(TRIAL_VOW)
       }
       break
     case 'match':
@@ -164,7 +168,7 @@ export function applyBattle(save: SaveState, encounter: Encounter, result: Battl
           next = addCreature(next, recruit)
           report.recruited = recruit
         }
-        unlockNextCondition()
+        unlockVow(CHALLENGE_VOWS[encounter.id])
       }
       break
     }

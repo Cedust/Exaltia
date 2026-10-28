@@ -10,8 +10,7 @@
     "preview": "vite preview",
     "test": "vitest run",
     "typecheck": "tsc -b",
-    "campaign": "tsx tools/campaign.ts",
-    "duel": "tsx tools/duel.ts"
+    "campaign": "tsx tools/campaign.ts"
   },
   "dependencies": {
     "@fontsource/alegreya-sans": "^5.3.0",

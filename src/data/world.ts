@@ -291,7 +291,7 @@ export const FIRST_TRIAL: Encounter = {
   kind: 'trial',
   name: 'The First Trial',
   opponent: "Hesper's Constructs",
-  description: 'Two old training constructs of the Spire. They hit softly, but they will not go easy on a plan that makes no sense.',
+  description: 'Two old training constructs of the Spire. They hit softly, but they never stop. Best of three, and Hesper is watching which Vows you swear.',
   backdrop: 'spire',
   members: [
     { creature: 'spire-golem', position: F(1), tactics: [{ condition: { type: 'always' }, skill: 'stone-fist', target: 'sameLane' }] },

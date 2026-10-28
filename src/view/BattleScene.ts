@@ -1,5 +1,4 @@
 import Phaser from 'phaser'
-import { describeCondition } from '../core/log'
 import { STATUS_RULES, statusName } from '../core/statuses'
 import type { BattleEvent, BattleResult, Element, Side, StatusId, UnitSnapshot } from '../core/types'
 
@@ -449,9 +448,8 @@ export class BattleScene extends Phaser.Scene {
           this.ascension(view, event.skillName)
           return DURATION.ascension
         }
-        const reason = event.tactic === null ? 'Basic Attack' : `Tactic ${event.tactic + 1} · ${describeCondition(event.condition!)}`
-        this.banner(view, event.skillName, reason)
         const targets = event.targets.map((id) => this.views.get(id)!)
+        this.banner(view, event.skillName, targets.length === 1 ? `→ ${targets[0].unit.name}` : `→ ${targets.length} targets`)
         const enemyTargets = targets.filter((t) => t.unit.side !== view.unit.side)
         if (enemyTargets.length > 0) {
           const target = enemyTargets[0]

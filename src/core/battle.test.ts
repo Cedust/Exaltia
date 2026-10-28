@@ -163,13 +163,13 @@ describe('runBattle', () => {
     expect(() => runBattle({ player: team(member('nope', 1, 'front')), enemy: team(member('b', 1, 'front')), seed: 1 }, c)).toThrow(/Unknown creature/)
   })
 
-  it('writes a Battle Log line naming the Tactic for every action', () => {
+  it('writes a Battle Log line naming actor, skill and targets for every action', () => {
     const tactics = [{ condition: { type: 'always' as const }, skill: 'strike', target: 'sameLane' as const }]
     const result = runBattle({ player: team(member('a', 1, 'front', tactics)), enemy: team(member('b', 1, 'front')), seed: 1 }, c)
     const log = formatBattleLog(result.events)
     const actionLines = log.map((line) => line.text).filter((text) => text.includes(' → '))
     expect(actionLines.length).toBe(ofType(result.events, 'actionChosen').length)
-    for (const line of actionLines) expect(line).toMatch(/Tactic \d: |Fallback: no Tactic matched/)
+    for (const line of actionLines) expect(line).toMatch(/^ {2}(a|b) → \w+ → (a|b)/)
   })
 })
 

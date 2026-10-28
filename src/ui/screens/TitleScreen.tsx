@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Ambience, Sigil } from '../kit'
 
-export function TitleScreen({ hasSave, onContinue, onNew, onDuel }: { hasSave: boolean; onContinue: () => void; onNew: () => void; onDuel: () => void }) {
+export function TitleScreen({ hasSave, onContinue, onNew }: { hasSave: boolean; onContinue: () => void; onNew: () => void }) {
   const [confirm, setConfirm] = useState(false)
   return (
     <div className="relative flex min-h-full flex-col items-center justify-center overflow-hidden px-6 py-10 text-center">
@@ -41,9 +41,6 @@ export function TitleScreen({ hasSave, onContinue, onNew, onDuel }: { hasSave: b
             </div>
           </div>
         )}
-        <button type="button" className="btn-ghost" onClick={onDuel}>
-          Vow Duel · Prototype
-        </button>
       </div>
       <p className="absolute bottom-3 text-[0.7rem] tracking-widest text-mist/60">MVP · v0.1</p>
     </div>

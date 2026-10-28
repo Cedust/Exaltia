@@ -1,7 +1,9 @@
 import { CONTENT } from '../../data'
 import { REGION_INTROS } from '../../data/story'
 import { REGION_BY_ID } from '../../data/world'
-import { describeModifier } from '../../game/battles'
+import { bestOfFor, describeModifier } from '../../game/battles'
+import { CHALLENGE_VOWS } from '../../game/rules'
+import { VOW_BY_ID } from '../../game/vows'
 import { regionOpen, tournamentStage, tournamentWon } from '../../game/campaign'
 import { actOf, type SaveState } from '../../game/save'
 import { CreatureArt, Divider, ElementLabel, Sheet } from '../kit'
@@ -132,8 +134,9 @@ export function RegionSheet({
                         </span>
                       ))}
                       <span className={`rounded-sm px-1.5 text-[0.65rem] uppercase tracking-wider ${done ? 'bg-gold/20 text-gold-bright' : 'bg-white/5 text-ivory/80'}`}>
-                        {done ? '✓ Won · replay for XP' : `Reward: ${recruit.name} joins`}
+                        {done ? '✓ Won · replay for XP' : `Reward: ${recruit.name} · Vow: ${VOW_BY_ID[CHALLENGE_VOWS[challenge.id]].name}`}
                       </span>
+                      <span className="rounded-sm bg-white/5 px-1.5 text-[0.65rem] uppercase tracking-wider text-ivory/80">Bo{bestOfFor(challenge)}</span>
                     </div>
                   </div>
                 </button>

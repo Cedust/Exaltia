@@ -8,7 +8,7 @@ const HINTS: Record<string, string> = {
   'spire-golem': 'Stands in front and draws attacks with Taunt.',
   'ruin-scout': 'Fast striker; Ambush reaches the Back Row.',
   'spire-mender': 'Heals one ally or the whole team.',
-  'relic-archer': 'Pierces a whole Lane or snipes the Back Row.',
+  'relic-archer': 'Pierces through the Front Row or snipes the Back Row.',
 }
 
 export function StarterScreen({ onDone }: { onDone: (picks: string[]) => void }) {

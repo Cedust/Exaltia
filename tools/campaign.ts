@@ -1,21 +1,22 @@
 /**
  * Campaign balancing: plays the story with a "typical player" (expected XP, Oath Shards, Skill Tree and
- * Mastery at each step, suggested Battle Plans) and prints win rates for every encounter.
+ * Mastery at each step, Auto-pick for Vows, the Vows unlocked so far) and prints match win rates for every
+ * encounter, plus the average turns per round.
  *
  *   npm run campaign                 # ring order from the Dawnreach
  *   npm run campaign -- --start fire --reverse --runs 200
  */
 import { parseArgs } from 'node:util'
 import { runBattle } from '../src/core/battle'
-import type { Position } from '../src/core/types'
 import { CONTENT } from '../src/data'
 import { STARTER_IDS } from '../src/data/creatures'
 import { SKILL_TREES, capstoneId, nodeId } from '../src/data/skillTrees'
 import { FIRST_TRIAL, REGIONS, type Encounter } from '../src/data/world'
-import { battleRules, duelEncounter, enemyTeam, finaleEncounter, playerTeam, suggestPlan } from '../src/game/battles'
+import { allowedIn, battleRules, duelEncounter, finaleEncounter, rowFor, startMatch } from '../src/game/battles'
 import { addCreature, chooseParagon } from '../src/game/campaign'
+import { autoPlay } from '../src/game/duel'
 import { treeState } from '../src/game/loadout'
-import { CONDITION_UNLOCKS, MAX_OATH_RANK, SHARDS_PER_RANK, XP } from '../src/game/rules'
+import { CHALLENGE_VOWS, MAX_OATH_RANK, SHARDS_PER_RANK, TRIAL_VOW, XP } from '../src/game/rules'
 import { newSave, type SaveState } from '../src/game/save'
 
 const { values } = parseArgs({
@@ -31,21 +32,28 @@ const RUNS = Number(values.runs)
 
 const isFront = (id: string) => /Front|Guardian|Striker/.test(CONTENT.creatures[id].role) && !/Back/.test(CONTENT.creatures[id].role)
 
-function winRate(save: SaveState, encounter: Encounter): number {
-  const enemy = enemyTeam(save, encounter)
-  const player = playerTeam(save)
+const pct = (n: number) => `${Math.round(n * 100)}%`.padStart(4)
+const turns: number[] = []
+
+/** Share of matches won with Auto-pick, and of single rounds in brackets; also collects the turns of every round. */
+function winRate(save: SaveState, encounter: Encounter): string {
   let wins = 0
-  for (let seed = 0; seed < RUNS; seed++) if (runBattle({ player, enemy, seed }, CONTENT).winner === 'player') wins++
-  return wins / RUNS
+  let rounds = 0
+  let roundWins = 0
+  for (let seed = 0; seed < RUNS; seed++) {
+    const { match, results } = autoPlay(startMatch(save, encounter, seed), (setup) => runBattle(setup, CONTENT))
+    if (match.wins.player > match.wins.enemy) wins++
+    rounds += results.length
+    roundWins += match.wins.player
+    for (const r of results) turns.push(r.turns)
+  }
+  return `${pct(wins / RUNS)} (${pct(roundWins / rounds).trim()})`
 }
 
 /** Picks the strongest allowed creatures and places them: fronts in the Front Row, the rest behind. */
 function formTeam(save: SaveState, encounter: Encounter): SaveState {
   const rules = battleRules(save, encounter)
-  const allowed = save.order.filter((id) => {
-    const c = CONTENT.creatures[id]
-    return !(rules.onlyAcolytes && c.kind === 'paragon') && !rules.banned.includes(c.element)
-  })
+  const allowed = save.order.filter((id) => allowedIn(rules, id))
   const score = (id: string) => (CONTENT.creatures[id].kind === 'paragon' ? 1000 + save.creatures[id].xp + save.creatures[id].oath * 20 : save.order.indexOf(id))
   const ranked = [...allowed].sort((a, b) => score(b) - score(a))
   const picks: string[] = []
@@ -53,15 +61,8 @@ function formTeam(save: SaveState, encounter: Encounter): SaveState {
   const firstFront = ranked.find(isFront)
   if (firstFront && rules.teamSize > 1) picks.push(firstFront)
   for (const id of ranked) if (picks.length < rules.teamSize && !picks.includes(id)) picks.push(id)
-  const fronts: (0 | 1 | 2)[] = [1, 0, 2]
-  const backs: (0 | 1 | 2)[] = [1, 2, 0]
-  const formation = picks.map((creature) => {
-    const front = isFront(creature) ? fronts.shift() : undefined
-    const position: Position = front !== undefined ? { lane: front, row: 'front' } : backs.length ? { lane: backs.shift()!, row: 'back' } : { lane: fronts.shift()!, row: 'front' }
-    return { creature, position }
-  })
-  const next = { ...save, formation }
-  return { ...next, tactics: Object.fromEntries(picks.map((id) => [id, suggestPlan(next, id)])) }
+  const formation = picks.reduce<SaveState['formation']>((f, creature) => [...f, { creature, row: rowFor(f, creature) }], [])
+  return { ...save, formation }
 }
 
 /** Expected growth between Tournaments: XP for every Paragon, Shards into the team, tree and Mastery. */
@@ -91,23 +92,22 @@ function grow(save: SaveState, tier: number): SaveState {
   return { ...save, creatures, shards }
 }
 
-const pct = (n: number) => `${Math.round(n * 100)}%`.padStart(4)
 
 // ── Prologue ──
-console.log('First Trial (each starter pair, suggested 1-slot plans):')
+console.log(`First Trial (each starter pair, ${RUNS} matches each):`)
 for (let i = 0; i < STARTER_IDS.length; i++) {
   for (let j = i + 1; j < STARTER_IDS.length; j++) {
     let save = newSave('Test')
     save = addCreature(addCreature(save, STARTER_IDS[i]), STARTER_IDS[j])
     save = formTeam(save, FIRST_TRIAL)
-    console.log(`  ${STARTER_IDS[i]} + ${STARTER_IDS[j]}: ${pct(winRate(save, FIRST_TRIAL))}`)
+    console.log(`  ${STARTER_IDS[i]} + ${STARTER_IDS[j]}: ${(winRate(save, FIRST_TRIAL))}`)
   }
 }
 
 // ── Story ──
 let save = newSave('Test')
 for (const id of values.starters!.split(',')) save = addCreature(save, id)
-save = { ...save, firstTrialWon: true, conditions: [...save.conditions, CONDITION_UNLOCKS[0]] }
+save = { ...save, firstTrialWon: true, vows: [...save.vows, TRIAL_VOW] }
 const start = REGIONS.findIndex((r) => r.id === values.start)
 const ring = REGIONS.map((_, i) => REGIONS[(start + (values.reverse ? -i : i) + REGIONS.length * 2) % REGIONS.length])
 
@@ -115,14 +115,13 @@ ring.forEach((region, step) => {
   const line: string[] = []
   for (const challenge of region.challengeSite.challenges) {
     save = formTeam(save, challenge)
-    line.push(`${challenge.id} ${pct(winRate(save, challenge))}`)
+    line.push(`${challenge.id} ${(winRate(save, challenge))}`)
     save = addCreature(save, region.acolytes[Number(challenge.id.slice(-1)) - 1])
-    const unlock = CONDITION_UNLOCKS.find((c) => !save.conditions.includes(c))
-    if (unlock) save = { ...save, conditions: [...save.conditions, unlock] }
+    save = { ...save, vows: [...save.vows, CHALLENGE_VOWS[challenge.id]] }
   }
   for (const match of region.tournament.matches) {
     save = formTeam(save, match)
-    line.push(`${match.id.split('-')[1]} ${pct(winRate(save, match))}`)
+    line.push(`${match.id.split('-')[1]} ${(winRate(save, match))}`)
   }
   const team = save.formation.map((f) => f.creature).join(', ')
   console.log(`T${step + 1} ${region.name.padEnd(18)} ${line.join(' · ')}   [${team}]`)
@@ -136,13 +135,16 @@ ring.forEach((region, step) => {
     if (step + 1 === duel.after) {
       const encounter = duelEncounter(save, duel.id)
       save = formTeam(save, encounter)
-      console.log(`   ${duel.id} vs ${encounter.members[0].creature}: ${pct(winRate(save, encounter))} [${save.formation[0].creature}]`)
+      console.log(`   ${duel.id} vs ${encounter.members[0].creature}: ${(winRate(save, encounter))} [${save.formation[0].creature}]`)
     }
   }
 })
 
 const finale = finaleEncounter(save)
 save = formTeam(save, finale)
-console.log(`Finale vs ${finale.members.map((m) => m.creature).join(', ')}: ${pct(winRate(save, finale))}  [${save.formation.map((f) => f.creature).join(', ')}]`)
+console.log(`Finale vs ${finale.members.map((m) => m.creature).join(', ')}: ${(winRate(save, finale))}  [${save.formation.map((f) => f.creature).join(', ')}]`)
 const lead = save.formation[0].creature
+const avg = turns.reduce((a, b) => a + b, 0) / turns.length
+const sorted = [...turns].sort((a, b) => a - b)
+console.log(`Turns per round: avg ${avg.toFixed(1)}, median ${sorted[Math.floor(sorted.length / 2)]}, p90 ${sorted[Math.floor(sorted.length * 0.9)]}`)
 console.log(`Lead Paragon ${lead}: Awakening ${treeState(save.creatures[lead]).points}, Oath ${save.creatures[lead].oath} shards`)

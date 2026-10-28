@@ -8,7 +8,7 @@ import type { BattleReport } from '../../game/campaign'
 import { MASTERY_EFFECTS } from '../../game/rules'
 import { describeSkill } from '../describeSkill'
 import { useGame } from '../GameContext'
-import { CONDITION_LABELS } from '../tactics'
+import { VowCard } from './MatchScreen'
 import { Ambience, CreatureArt, Divider, ElementLabel, ShardIcon, Sigil, Stars } from '../kit'
 
 function defeatTips(encounter: Encounter): string[] {
@@ -16,8 +16,9 @@ function defeatTips(encounter: Encounter): string[] {
   const counters = enemyElements.map((e) => opposite(e)).filter((e): e is NonNullable<typeof e> => !!e)
   const tips = [
     counters.length > 0 ? `Bring ${counters.map(elementName).join(' or ')} skills: those enemies are Weak to them.` : '',
-    'Check the Scout tab: enemy Tactics hint at what they will do first.',
-    'A healer with "Ally Lifeforce < 50%" keeps a Front Row standing far longer.',
+    'Check the Scouting tab: the opponent’s favourite Vows tell you what to answer with. Fireproof against Burn, Cleansing Oath against hexes.',
+    'Lost a round? You see four Vows next time, one at least Rare. At match point against you, one is always Exalted.',
+    'Move a fragile creature to the Back Row between rounds: the Front Row shields it.',
     'Lost creatures still gain some experience. Win a Challenge or two and come back stronger.',
   ]
   return tips.filter(Boolean)
@@ -35,6 +36,9 @@ export function ResultScreen({ encounter, report, onContinue }: { encounter: Enc
       <div className="mx-auto max-w-xl text-center rise-in">
         <p className="label-caps">{encounter.name}</p>
         <h1 className={`title-display mt-1 text-5xl ${report.won ? '' : '!text-[#ff9b8a] !bg-none'}`}>{report.won ? 'Victory' : 'Defeat'}</h1>
+        <p className="mt-1 font-display text-xl text-gold-bright">
+          {report.score.player} – {report.score.enemy}
+        </p>
         {report.won && report.shards > 0 && (
           <p className="mt-3 inline-flex items-center gap-2 rounded-full border border-gold/40 bg-black/40 px-4 py-1.5 font-display text-gold-bright">
             <ShardIcon /> +{report.shards} Oath Shards
@@ -63,11 +67,10 @@ export function ResultScreen({ encounter, report, onContinue }: { encounter: Enc
             </div>
           </div>
         )}
-        {report.unlockedCondition && (
-          <div className="ornate-soft fade-in p-3 text-center">
-            <p className="label-caps">New Tactic Condition</p>
-            <p className="mt-1 font-display text-lg text-gold-bright">{CONDITION_LABELS[report.unlockedCondition as keyof typeof CONDITION_LABELS]}</p>
-            <p className="text-xs text-mist">Your Battle Plans can now use it.</p>
+        {report.unlockedVow && (
+          <div className="fade-in">
+            <p className="label-caps mb-1 text-center">A new Vow · it can now appear in your offers</p>
+            <VowCard id={report.unlockedVow} />
           </div>
         )}
 

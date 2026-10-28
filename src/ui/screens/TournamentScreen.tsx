@@ -1,6 +1,6 @@
 import { CONTENT } from '../../data'
 import { REGION_BY_ID } from '../../data/world'
-import { battleRules } from '../../game/battles'
+import { battleRules, bestOfFor } from '../../game/battles'
 import { tournamentStage, tournamentWon } from '../../game/campaign'
 import type { SaveState } from '../../game/save'
 import { useGame } from '../GameContext'
@@ -53,7 +53,7 @@ export function TournamentScreen({ regionId, onBack, onPrepare }: { regionId: st
                     <div className="label-caps !text-[0.6rem]">{match.name}</div>
                     <div className="truncate font-display text-base tracking-wide text-ivory">{match.opponent}</div>
                     <div className="text-xs text-mist">
-                      {rules.teamSize}v{rules.teamSize}
+                      {rules.teamSize}v{rules.teamSize} · Bo{bestOfFor(match)}
                       {final ? ' · Boss battle' : ''}
                     </div>
                   </div>

@@ -1,85 +1,20 @@
 import { createRng, type Rng } from '../core/rng'
-import type { Position, Row, Side, SkillDef, StatusId, Team, TeamMember } from '../core/types'
+import type { BattleResult, Loadout, Position, Row, Side, SkillDef, StatusId, Team, TeamMember } from '../core/types'
 import { CONTENT } from '../data'
 import { autoPlan } from './autoPlan'
-import { enemyLoadout } from './loadout'
-import { CONDITION_UNLOCKS, STARTING_CONDITIONS } from './rules'
+import { ALL_CONDITIONS } from './rules'
 import { RARITY_RANK, RARITY_WEIGHT, VOWS, VOW_BY_ID, type Rarity, type VowContext, type VowDef, type VowMember } from './vows'
 
 /**
- * Vow Duels prototype: a best-of-X match of short auto fights. Teams are locked before the match; before every
- * round both sides swear one Vow. The opponent always picks and reveals first.
+ * Vow Duels: every battle is a best-of-X match of short auto fights. Teams are locked before the match; before
+ * every round both sides swear one Vow. The opponent always picks and reveals first.
  */
 
-export const DUEL_TEAM_SIZE = 3
-const TACTIC_SLOTS = 4
-/** Duels hit harder than campaign battles, so a round lasts about 30-45 seconds. */
+/** Role behaviour is automatic: every creature gets an auto plan of this size. */
+const PLAN_SLOTS = 4
+/** Duels hit harder than the old long battles, so a round lasts about 30-45 seconds. */
 export const DUEL_DAMAGE_BONUS = 80
-const ALL_CONDITIONS = [...STARTING_CONDITIONS, ...CONDITION_UNLOCKS]
-
-/** Creatures the player may bring to the prototype. */
-export const DUEL_POOL = ['basaltor', 'pyrelle', 'kyrael', 'nivaris', 'fenric', 'maressa', 'spire-golem', 'spire-mender']
-/** World strength used for both sides (like the third Tournament of a journey). */
-export const PLAYER_TIER = 2
-
-export interface DuelOpponent {
-  id: string
-  name: string
-  theme: string
-  description: string
-  backdrop: string
-  tier: number
-  members: { creature: string; row: Row }[]
-  /** Vows this opponent likes to swear. */
-  prefers: string[]
-}
-
-export const DUEL_OPPONENTS: DuelOpponent[] = [
-  {
-    id: 'ashen-twins',
-    name: 'The Ashen Twins',
-    theme: 'Burn and Bargains',
-    description: 'Two fire scholars and their knight. They set everything ablaze and gladly pay in blood for more power.',
-    backdrop: 'fire',
-    tier: 7,
-    members: [
-      { creature: 'cinder-knight', row: 'front' },
-      { creature: 'ember-sage', row: 'back' },
-      { creature: 'ember-sage', row: 'back' },
-    ],
-    prefers: ['kindling', 'lingering-wound', 'ember-covenant', 'blood-price', 'wildfire', 'glass-vanguard'],
-  },
-  {
-    id: 'huntress-sigrun',
-    name: 'Huntress Sigrun',
-    theme: 'Chill and Endurance',
-    description: 'A hunter of the Frostmere. Her pack is slow to fall and slows you down until you cannot run.',
-    backdrop: 'ice',
-    tier: 5,
-    members: [
-      { creature: 'frostguard', row: 'front' },
-      { creature: 'duskblade', row: 'front' },
-      { creature: 'rime-mystic', row: 'back' },
-    ],
-    prefers: ['frostbite', 'stoneskin', 'vigil', 'anchor', 'last-breath', 'undying-oath'],
-  },
-  {
-    id: 'stormcrew',
-    name: "Captain Brannoc's Stormcrew",
-    theme: 'Speed and Strikes',
-    description: 'Sky-sailors who hit first and hit hard. If they win the first exchange, they rarely lose the round.',
-    backdrop: 'thunder',
-    tier: 4,
-    members: [
-      { creature: 'spark-monk', row: 'front' },
-      { creature: 'gale-dancer', row: 'front' },
-      { creature: 'storm-chanter', row: 'back' },
-    ],
-    prefers: ['quickened-step', 'opening-gambit', 'split-the-flame', 'avenger', 'keen-edge', 'shatter-ward'],
-  },
-]
-
-export const OPPONENT_BY_ID: Record<string, DuelOpponent> = Object.fromEntries(DUEL_OPPONENTS.map((o) => [o.id, o]))
+export const MAX_PER_ROW = 3
 
 // ── Teams ──
 
@@ -89,6 +24,12 @@ export interface DuelSlot {
   row: Row
 }
 
+/** A team member of a match: its slot plus the strength it brings (player progress or enemy tier). */
+export interface MatchMember extends DuelSlot {
+  loadout: Loadout
+  boss?: boolean
+}
+
 /** Lanes are filled from the middle out, so a row of up to three always looks tidy. */
 export function positions(slots: DuelSlot[]): Position[] {
   const order: (0 | 1 | 2)[] = [1, 0, 2]
@@ -96,9 +37,10 @@ export function positions(slots: DuelSlot[]): Position[] {
   return slots.map((s) => ({ lane: order[used[s.row]++], row: s.row }))
 }
 
-export const rowFull = (slots: DuelSlot[], row: Row, except = -1) => slots.filter((s, i) => i !== except && s.row === row).length >= 3
+export const rowFull = (slots: DuelSlot[], row: Row, except = -1) => slots.filter((s, i) => i !== except && s.row === row).length >= MAX_PER_ROW
 
-export const defaultRow = (id: string): Row => (/Front|Guardian|Striker|Bulwark|Brawler/.test(CONTENT.creatures[id].role) ? 'front' : 'back')
+export const isFrontLiner = (id: string) => /^Front|Guardian|Striker|Bulwark|Brawler/.test(CONTENT.creatures[id].role)
+export const defaultRow = (id: string): Row => (isFrontLiner(id) ? 'front' : 'back')
 
 /** A sworn Vow: which one and, for creature Vows, which team member (by index) carries it. */
 export interface SwornVow {
@@ -106,16 +48,16 @@ export interface SwornVow {
   target?: number
 }
 
-function baseMember(slot: DuelSlot, tier: number): VowMember {
-  const creature = CONTENT.creatures[slot.creature]
-  const loadout = enemyLoadout(slot.creature, { tier, teamSize: DUEL_TEAM_SIZE })
+function baseMember(member: MatchMember): VowMember {
+  const creature = CONTENT.creatures[member.creature]
+  const { loadout } = member
   const ids = [...(loadout.skills ?? creature.skills), creature.basicAttack, ...(creature.ascension ? [creature.ascension] : [])]
   return {
     creature,
-    row: slot.row,
-    stats: { ...loadout.stats! },
+    row: member.row,
+    stats: { ...(loadout.stats ?? creature.stats) },
     passives: [...(loadout.passives ?? []), { type: 'damageDealt', percent: DUEL_DAMAGE_BONUS }],
-    skillDefs: Object.fromEntries(ids.map((id) => [id, CONTENT.skills[id]])),
+    skillDefs: Object.fromEntries(ids.map((id) => [id, loadout.skillDefs?.[id] ?? CONTENT.skills[id]])),
   }
 }
 
@@ -127,53 +69,55 @@ function receivers(vow: VowDef, members: VowMember[], target?: number): VowMembe
 }
 
 /** The team for one round: base strength, then every sworn Vow in order, then the role behaviour (auto plan). */
-export function buildTeam(slots: DuelSlot[], vows: SwornVow[], tier: number): Team {
-  const members = slots.map((s) => baseMember(s, tier))
+export function buildTeam(team: MatchMember[], vows: SwornVow[]): Team {
+  const members = team.map(baseMember)
   for (const sworn of vows) {
     const vow = VOW_BY_ID[sworn.vow]
     for (const m of receivers(vow, members, sworn.target)) vow.apply(m)
   }
-  const places = positions(slots)
+  const places = positions(team)
   return {
     members: members.map((m, i): TeamMember => {
       const usable = Object.keys(m.skillDefs).filter((id) => id !== m.creature.basicAttack && id !== m.creature.ascension)
       const skills = usable.map((id) => m.skillDefs[id])
-      return {
+      const boss = team[i].boss
+      const member: TeamMember = {
         creature: m.creature.id,
         position: places[i],
-        tactics: autoPlan(skills, TACTIC_SLOTS, ALL_CONDITIONS),
+        tactics: autoPlan(skills, boss ? PLAN_SLOTS - 1 : PLAN_SLOTS, ALL_CONDITIONS),
         loadout: { stats: m.stats, skills: usable, skillDefs: m.skillDefs, passives: m.passives },
       }
+      if (boss) member.boss = { phase2: autoPlan(skills, PLAN_SLOTS + 1, ALL_CONDITIONS) }
+      return member
     }),
   }
 }
 
 // ── Offers ──
 
-const contextOf = (slots: DuelSlot[], vows: SwornVow[]): VowContext => ({
-  creatures: slots.map((s) => CONTENT.creatures[s.creature]),
+const contextOf = (team: MatchMember[], vows: SwornVow[]): VowContext => ({
+  creatures: team.map((s) => CONTENT.creatures[s.creature]),
   vows: vows.map((v) => v.vow),
 })
 
 /** Team members (by index) that may still carry this creature Vow. */
-export function eligibleTargets(vow: VowDef, slots: DuelSlot[], vows: SwornVow[], tier: number): number[] {
+export function eligibleTargets(vow: VowDef, team: MatchMember[], vows: SwornVow[]): number[] {
   if (vow.scope !== 'creature') return []
-  const members = slots.map((s) => baseMember(s, tier))
-  return members
-    .map((m, i) => ({ m, i }))
+  return team
+    .map((m, i) => ({ m: baseMember(m), i }))
     .filter(({ m, i }) => (!vow.canTarget || vow.canTarget(m)) && !vows.some((v) => v.vow === vow.id && v.target === i))
     .map(({ i }) => i)
 }
 
-function available(vow: VowDef, slots: DuelSlot[], vows: SwornVow[], tier: number, opponentVows: SwornVow[]): boolean {
-  if (vow.requires && !vow.requires(contextOf(slots, vows))) return false
+function available(vow: VowDef, team: MatchMember[], vows: SwornVow[], opponentVows: SwornVow[]): boolean {
+  if (vow.requires && !vow.requires(contextOf(team, vows))) return false
   if (vow.id === 'mirror-oath') {
     const last = opponentVows[opponentVows.length - 1]
     if (!last || last.vow === 'mirror-oath') return false
-    return available(VOW_BY_ID[last.vow], slots, vows, tier, [])
+    return available(VOW_BY_ID[last.vow], team, vows, [])
   }
   if (vow.scope !== 'creature') return !vows.some((v) => v.vow === vow.id)
-  return eligibleTargets(vow, slots, vows, tier).length > 0
+  return eligibleTargets(vow, team, vows).length > 0
 }
 
 export interface OfferRules {
@@ -192,18 +136,18 @@ function weighted<T>(items: T[], weight: (item: T) => number, rng: Rng): T {
   return items[items.length - 1]
 }
 
-/** Draws distinct Vows for an offer. Covenants show up more often once their combo is in reach. */
-export function makeOffer(rules: OfferRules, slots: DuelSlot[], vows: SwornVow[], opponentVows: SwornVow[], tier: number, rng: Rng, allowMirror: boolean): string[] {
-  const pool = VOWS.filter((v) => (allowMirror || v.id !== 'mirror-oath') && available(v, slots, vows, tier, opponentVows))
+/** Draws distinct Vows from a pool. Covenants show up more often once their combo is in reach. */
+export function makeOffer(rules: OfferRules, pool: string[], team: MatchMember[], vows: SwornVow[], opponentVows: SwornVow[], rng: Rng): string[] {
+  const candidates = VOWS.filter((v) => pool.includes(v.id) && available(v, team, vows, opponentVows))
   const weight = (v: VowDef) => (v.kind === 'covenant' ? 25 : RARITY_WEIGHT[v.rarity])
   const offer: VowDef[] = []
   while (offer.length < rules.count) {
-    const rest = pool.filter((v) => !offer.includes(v))
+    const rest = candidates.filter((v) => !offer.includes(v))
     if (rest.length === 0) break
     offer.push(weighted(rest, weight, rng))
   }
   if (rules.atLeast && !offer.some((v) => RARITY_RANK[v.rarity] >= RARITY_RANK[rules.atLeast!])) {
-    const better = pool.filter((v) => !offer.includes(v) && RARITY_RANK[v.rarity] >= RARITY_RANK[rules.atLeast!])
+    const better = candidates.filter((v) => !offer.includes(v) && RARITY_RANK[v.rarity] >= RARITY_RANK[rules.atLeast!])
     if (better.length > 0) offer[offer.length - 1] = weighted(better, weight, rng)
   }
   return offer.map((v) => v.id)
@@ -212,11 +156,11 @@ export function makeOffer(rules: OfferRules, slots: DuelSlot[], vows: SwornVow[]
 // ── CPU choice ──
 
 /** Statuses a team can inflict on its opponents, plus Barrier and Taunt if it uses them. */
-function threats(slots: DuelSlot[]): Set<StatusId> {
+function threats(team: MatchMember[]): Set<StatusId> {
   const out = new Set<StatusId>()
-  for (const s of slots) {
+  for (const s of team) {
     const creature = CONTENT.creatures[s.creature]
-    for (const id of [...creature.skills, ...(creature.ascension ? [creature.ascension] : [])]) {
+    for (const id of [...(s.loadout.skills ?? creature.skills), ...(creature.ascension ? [creature.ascension] : [])]) {
       const skill = CONTENT.skills[id]
       if (skill.inflicts) out.add(skill.inflicts.status)
       if (skill.selfStatus) out.add(skill.selfStatus.status)
@@ -229,10 +173,10 @@ const attackOf = (m: VowMember) => Math.max(m.stats.might, m.stats.resonance)
 const healer = (m: VowMember) => Object.values(m.skillDefs).some((s: SkillDef) => s.effect === 'heal')
 
 /** Who the CPU (and Auto-pick) puts a creature Vow on. */
-export function aimTarget(vow: VowDef, slots: DuelSlot[], vows: SwornVow[], tier: number): number | undefined {
-  const options = eligibleTargets(vow, slots, vows, tier)
+export function aimTarget(vow: VowDef, team: MatchMember[], vows: SwornVow[]): number | undefined {
+  const options = eligibleTargets(vow, team, vows)
   if (options.length === 0) return undefined
-  const members = slots.map((s) => baseMember(s, tier))
+  const members = team.map(baseMember)
   const score = (i: number) => {
     const m = members[i]
     switch (vow.aim) {
@@ -250,8 +194,8 @@ export function aimTarget(vow: VowDef, slots: DuelSlot[], vows: SwornVow[], tier
 }
 
 /** The CPU's pick from an offer: rarity first, then its theme, then answers to what the opponent inflicts. */
-export function chooseVow(offer: string[], prefers: string[], opponentSlots: DuelSlot[]): string {
-  const danger = threats(opponentSlots)
+export function chooseVow(offer: string[], prefers: string[], opponent: MatchMember[]): string {
+  const danger = threats(opponent)
   const value = (id: string) => {
     const vow = VOW_BY_ID[id]
     let v = RARITY_RANK[vow.rarity] * 3
@@ -267,11 +211,19 @@ export function chooseVow(offer: string[], prefers: string[], opponentSlots: Due
 // ── Match ──
 
 export interface DuelMatch {
+  /** Encounter name, e.g. "Dawnreach Tournament · Final". */
+  name: string
+  /** Who the player faces, shown on the score. */
   opponent: string
+  backdrop: string
   bestOf: number
   seed: number
-  player: DuelSlot[]
-  enemy: DuelSlot[]
+  player: MatchMember[]
+  enemy: MatchMember[]
+  /** Vows each side may be offered. */
+  pools: Record<Side, string[]>
+  /** Vows the opponent likes to swear. */
+  prefers: string[]
   vows: Record<Side, SwornVow[]>
   wins: Record<Side, number>
   /** Winner of each round played so far. */
@@ -281,29 +233,67 @@ export interface DuelMatch {
   rerolls: number
 }
 
+export interface MatchSetup {
+  name: string
+  opponent: string
+  backdrop: string
+  bestOf: number
+  seed: number
+  player: MatchMember[]
+  enemy: MatchMember[]
+  playerPool: string[]
+  enemyPool?: string[]
+  prefers: string[]
+  /** Vows the opponent already holds when the match begins (Boss Vows). */
+  bossVows?: SwornVow[]
+}
+
+/** Draws after this many rounds no longer replay: the side with more wins takes the match, a tie goes to the opponent. */
+const ROUND_LIMIT_EXTRA = 3
+
 export const winsNeeded = (match: DuelMatch) => Math.ceil(match.bestOf / 2)
 export const roundNumber = (match: DuelMatch) => match.rounds.length + 1
 
 export function matchWinner(match: DuelMatch): Side | null {
   if (match.wins.player >= winsNeeded(match)) return 'player'
   if (match.wins.enemy >= winsNeeded(match)) return 'enemy'
+  if (match.rounds.length >= match.bestOf + ROUND_LIMIT_EXTRA) return match.wins.player > match.wins.enemy ? 'player' : 'enemy'
   return null
 }
 
-export function newMatch(opponentId: string, player: DuelSlot[], seed: number, bestOf = 5): DuelMatch {
-  const opponent = OPPONENT_BY_ID[opponentId]
+export function newMatch(setup: MatchSetup): DuelMatch {
   return {
-    opponent: opponentId,
-    bestOf,
-    seed,
-    player,
-    enemy: opponent.members.map((m) => ({ ...m })),
-    vows: { player: [], enemy: [] },
+    name: setup.name,
+    opponent: setup.opponent,
+    backdrop: setup.backdrop,
+    bestOf: setup.bestOf,
+    seed: setup.seed,
+    player: setup.player.map((m) => ({ ...m })),
+    enemy: setup.enemy.map((m) => ({ ...m })),
+    pools: { player: setup.playerPool, enemy: setup.enemyPool ?? VOWS.map((v) => v.id) },
+    prefers: setup.prefers,
+    vows: { player: [], enemy: [...(setup.bossVows ?? [])] },
     wins: { player: 0, enemy: 0 },
     rounds: [],
     rerollsLeft: 1,
     rerolls: 0,
   }
+}
+
+/**
+ * Boss Vows: the opponent's favourite Vows it can carry, sworn before the match and shown when scouting.
+ * Mirror Oath is left out because there is nothing to copy yet.
+ */
+export function pickBossVows(team: MatchMember[], prefers: string[], count: number): SwornVow[] {
+  const sworn: SwornVow[] = []
+  const order = [...prefers, ...[...VOWS].sort((a, b) => RARITY_RANK[b.rarity] - RARITY_RANK[a.rarity]).map((v) => v.id)]
+  for (const id of order) {
+    if (sworn.length >= count) break
+    const vow = VOW_BY_ID[id]
+    if (id === 'mirror-oath' || sworn.some((s) => s.vow === id) || !available(vow, team, sworn, [])) continue
+    sworn.push(vow.scope === 'creature' ? { vow: id, target: aimTarget(vow, team, sworn) } : { vow: id })
+  }
+  return sworn
 }
 
 /** Offer rules for one side this round: the last round's loser sees 4 Vows, a side at match point gets an Exalted. */
@@ -315,14 +305,13 @@ export function offerRules(match: DuelMatch, side: Side): OfferRules {
   return { count: lostLast ? 4 : 3, atLeast: atMatchPoint ? 'exalted' : lostLast ? 'rare' : undefined }
 }
 
-const tierOf = (match: DuelMatch, side: Side) => (side === 'player' ? PLAYER_TIER : OPPONENT_BY_ID[match.opponent].tier)
-
 const offerRng = (match: DuelMatch, side: Side) => createRng(match.seed + roundNumber(match) * 7919 + (side === 'enemy' ? 104_729 : match.rerolls * 613))
 
 export function offerFor(match: DuelMatch, side: Side): string[] {
   const other: Side = side === 'player' ? 'enemy' : 'player'
-  const slots = side === 'player' ? match.player : match.enemy
-  return makeOffer(offerRules(match, side), slots, match.vows[side], match.vows[other], tierOf(match, side), offerRng(match, side), side === 'player')
+  // Mirror Oath is a player Vow: the CPU never copies.
+  const pool = side === 'enemy' ? match.pools.enemy.filter((id) => id !== 'mirror-oath') : match.pools.player
+  return makeOffer(offerRules(match, side), pool, match[side], match.vows[side], match.vows[other], offerRng(match, side))
 }
 
 /** Turns a pick into a sworn Vow; Mirror Oath becomes a copy of the opponent's last Vow. */
@@ -331,9 +320,8 @@ export function resolveVow(match: DuelMatch, side: Side, vowId: string, target?:
   const id = vowId === 'mirror-oath' ? match.vows[other][match.vows[other].length - 1].vow : vowId
   const vow = VOW_BY_ID[id]
   if (vow.scope !== 'creature') return { vow: id }
-  const slots = side === 'player' ? match.player : match.enemy
-  const options = eligibleTargets(vow, slots, match.vows[side], tierOf(match, side))
-  const chosen = target !== undefined && options.includes(target) ? target : aimTarget(vow, slots, match.vows[side], tierOf(match, side))
+  const options = eligibleTargets(vow, match[side], match.vows[side])
+  const chosen = target !== undefined && options.includes(target) ? target : aimTarget(vow, match[side], match.vows[side])
   return { vow: id, target: chosen }
 }
 
@@ -344,24 +332,20 @@ export const swear = (match: DuelMatch, side: Side, sworn: SwornVow): DuelMatch 
 
 /** The opponent's turn at the start of a round: it picks from its own offer and reveals the Vow. */
 export function enemySwears(match: DuelMatch): DuelMatch {
-  const opponent = OPPONENT_BY_ID[match.opponent]
   const offer = offerFor(match, 'enemy')
   if (offer.length === 0) return match
-  const pick = chooseVow(offer, opponent.prefers, match.player)
+  const pick = chooseVow(offer, match.prefers, match.player)
   return swear(match, 'enemy', resolveVow(match, 'enemy', pick))
 }
 
 /** Auto-pick for the player: the same rule the CPU uses, without a theme. */
-export function autoPick(match: DuelMatch, offer: string[]): SwornVow {
-  const pick = chooseVow(offer, [], match.enemy)
-  return resolveVow(match, 'player', pick)
+export function autoPick(match: DuelMatch, offer: string[]): SwornVow | null {
+  if (offer.length === 0) return null
+  return resolveVow(match, 'player', chooseVow(offer, [], match.enemy))
 }
 
 export function roundTeams(match: DuelMatch): { player: Team; enemy: Team } {
-  return {
-    player: buildTeam(match.player, match.vows.player, PLAYER_TIER),
-    enemy: buildTeam(match.enemy, match.vows.enemy, OPPONENT_BY_ID[match.opponent].tier),
-  }
+  return { player: buildTeam(match.player, match.vows.player), enemy: buildTeam(match.enemy, match.vows.enemy) }
 }
 
 export const roundSeed = (match: DuelMatch) => match.seed * 31 + roundNumber(match)
@@ -373,9 +357,24 @@ export function recordRound(match: DuelMatch, winner: Side | 'draw'): DuelMatch 
 }
 
 /** Describes who carries a sworn Vow, e.g. "Ember Sage" or "Front Row". */
-export function carrierName(sworn: SwornVow, slots: DuelSlot[]): string {
+export function carrierName(sworn: SwornVow, team: DuelSlot[]): string {
   const vow = VOW_BY_ID[sworn.vow]
   if (vow.scope === 'team') return 'Team'
   if (vow.scope === 'front') return 'Front Row'
-  return sworn.target === undefined ? '' : CONTENT.creatures[slots[sworn.target].creature].name
+  return sworn.target === undefined ? '' : CONTENT.creatures[team[sworn.target].creature].name
+}
+
+/** Plays a whole match with Auto-pick for the player (tests and the balance tools). */
+export function autoPlay(start: DuelMatch, run: (setup: { player: Team; enemy: Team; seed: number }) => BattleResult): { match: DuelMatch; results: BattleResult[] } {
+  let match = start
+  const results: BattleResult[] = []
+  while (!matchWinner(match)) {
+    match = enemySwears(match)
+    const pick = autoPick(match, offerFor(match, 'player'))
+    if (pick) match = swear(match, 'player', pick)
+    const result = run({ ...roundTeams(match), seed: roundSeed(match) })
+    results.push(result)
+    match = recordRound(match, result.winner)
+  }
+  return { match, results }
 }

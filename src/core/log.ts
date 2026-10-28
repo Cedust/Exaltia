@@ -60,7 +60,7 @@ export interface BattleLogLine {
   text: string
 }
 
-/** Turns the event stream into readable Battle Log lines; every action names the Tactic that fired. */
+/** Turns the event stream into readable Battle Log lines. */
 export function formatBattleLog(events: BattleEvent[]): BattleLogLine[] {
   const units = new Map<string, UnitSnapshot>()
   const name = (id: string) => units.get(id)?.name ?? id
@@ -75,7 +75,7 @@ export function formatBattleLog(events: BattleEvent[]): BattleLogLine[] {
         for (const side of ['player', 'enemy'] as const) {
           const team = event.units
             .filter((u) => u.side === side)
-            .map((u) => `${u.name} (Lane ${u.position.lane + 1} ${u.position.row === 'front' ? 'Front' : 'Back'})`)
+            .map((u) => `${u.name} (${u.position.row === 'front' ? 'Front' : 'Back'} Row)`)
           push(`${side === 'player' ? 'Player' : 'Enemy'}: ${team.join(', ')}`)
         }
         break
@@ -110,12 +110,7 @@ export function formatBattleLog(events: BattleEvent[]): BattleLogLine[] {
         push(`  ${statusName(event.status)} wears off ${name(event.unit)}`)
         break
       case 'actionChosen': {
-        const reason = event.ascension
-          ? 'ASCENSION'
-          : event.tactic === null
-            ? 'Fallback: no Tactic matched'
-            : `Tactic ${event.tactic + 1}: ${describeCondition(event.condition!)}`
-        push(`  ${name(event.actor)} → ${event.skillName} → ${event.targets.map(name).join(', ')} · ${reason}`)
+        push(`  ${name(event.actor)} → ${event.skillName} → ${event.targets.map(name).join(', ')}${event.ascension ? ' · ASCENSION' : ''}`)
         break
       }
       case 'damageDealt':

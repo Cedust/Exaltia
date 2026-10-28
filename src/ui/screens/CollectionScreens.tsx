@@ -5,7 +5,6 @@ import { CONTENT } from '../../data'
 import { PARAGON_IDS, STARTER_IDS } from '../../data/creatures'
 import { SKILL_TREES, capstoneId, nodeId, type TreeNode } from '../../data/skillTrees'
 import { REGIONS } from '../../data/world'
-import { slotsFor } from '../../game/battles'
 import { canBuy, oathRank, playerLoadout, treeState } from '../../game/loadout'
 import { AWAKENING_XP, MASTERY_EFFECTS, MASTERY_USES, MAX_AWAKENING, MAX_OATH_RANK, OATH_PERKS, SHARDS_PER_RANK, awakeningOf, masteryOf } from '../../game/rules'
 import { tournamentsWon, type OwnedCreature } from '../../game/save'
@@ -125,10 +124,9 @@ export function CreatureScreen({ creatureId, onBack }: { creatureId: string; onB
               <Bar value={owned.xp - AWAKENING_XP[awakening]} max={awakening >= MAX_AWAKENING ? 1 : nextXp - AWAKENING_XP[awakening]} className="mt-1" />
             </div>
           ) : (
-            <p className="text-xs text-mist">Acolytes keep their skills but grow stronger with every Tournament you win. Up to 3 Tactics.</p>
+            <p className="text-xs text-mist">Acolytes keep their skills but grow stronger with every Tournament you win.</p>
           )}
           <StatLine stats={loadout.stats ?? creature.stats} />
-          <p className="text-[0.7rem] text-mist">Tactic Slots now: {slotsFor(save, creatureId)}</p>
         </div>
 
         {paragon && (
