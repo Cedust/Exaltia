@@ -12,7 +12,7 @@ import { describeSkill } from '../describeSkill'
 import { useGame } from '../GameContext'
 import { Ambience, Bar, CreatureArt, Divider, ElementGem, ElementLabel, ScreenHeader, ShardIcon, Stars } from '../kit'
 import { ELEMENT_HEX } from '../styles'
-import { StatLine } from './PreBattleScreen'
+import { StatLine } from '../CreatureInfo'
 
 const ROMAN = ['0', 'I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X']
 

@@ -3,6 +3,7 @@ import type { Lane, Row, Side } from '../core/types'
 import { CONTENT } from '../data'
 import { LANES, LANE_NAMES, moveTo, occupant, type DuelSlot, type TargetPreview } from '../game/duel'
 import { CreatureArt } from './kit'
+import { haptic } from './prepare'
 import { ELEMENT_TEXT } from './styles'
 
 /**
@@ -34,6 +35,7 @@ export function FormationGrid<T extends DuelSlot>({
 
   const tap = (lane: Lane, row: Row) => {
     if (!onChange) return
+    haptic()
     const here = occupant(player, lane, row)
     if (selected === null) return setSelected(here >= 0 ? here : null)
     if (here !== selected) onChange(moveTo(player, selected, lane, row))
@@ -82,6 +84,13 @@ export function FormationGrid<T extends DuelSlot>({
 
   return (
     <div className="space-y-1">
+      {onChange && (
+        <p className={`min-h-11 px-2 pb-1 text-center text-sm ${selected !== null ? 'text-gold-bright' : 'text-mist/80'}`}>
+          {selected !== null && player[selected]
+            ? `Move ${CONTENT.creatures[player[selected].creature].name}: tap a cell, or another creature to swap.`
+            : 'Tap one of your creatures to move it.'}
+        </p>
+      )}
       <div className={`grid ${COLUMNS} gap-1 text-center`}>
         <span className="label-caps col-span-2 !text-2xs">You</span>
         <span />
@@ -155,7 +164,6 @@ export function FormationGrid<T extends DuelSlot>({
           </span>
         </div>
       )}
-      {onChange && <p className="text-center text-xs text-mist/80">Tap a creature, then a cell to move it there (or swap).</p>}
     </div>
   )
 }
