@@ -701,26 +701,32 @@ export class BattleScene extends Phaser.Scene {
     if (!stay) this.tweens.add({ targets: group, alpha: 0, delay: 900 / speed, duration: 300 / speed, onComplete: () => group.destroy() })
   }
 
-  /** The visible Turn Order: current actor first, then the predicted next turns. */
+  /**
+   * The visible Turn Order, kept short: who acts now (large, gold ring), then the next three turns smaller and
+   * fainter. A thin bar under each portrait marks the side (blue yours, red theirs).
+   */
   private drawTurnOrder(ids: string[]) {
     const container = this.turnOrder!
     container.removeAll(true)
-    const { width, turnY, portrait, ui } = this.layout
-    const slots = portrait ? 8 : 9
-    const size = Math.round(46 * ui)
-    const gap = 8
-    const startX = width / 2 - ((slots - 1) * (size + gap)) / 2
-    ids.slice(0, slots).forEach((id, i) => {
+    const { width, turnY, ui } = this.layout
+    const now = Math.round(66 * ui)
+    const next = Math.round(46 * ui)
+    const gap = Math.round(10 * ui)
+    const shown = ids.slice(0, 4)
+    const total = now + (shown.length - 1) * (next + gap) + gap
+    let x = width / 2 - total / 2 + now / 2
+    shown.forEach((id, i) => {
       const unit = this.views.get(id)!.unit
-      const x = startX + i * (size + gap) + (i === 0 ? -4 : 0)
-      const s = i === 0 ? size + 10 : size
-      const disc = this.add.circle(x, turnY, s / 2, 0x0a0918, 0.85).setStrokeStyle(i === 0 ? 3 : 2, i === 0 ? 0xffe7ad : SIDE_COLOR[unit.side])
+      const s = i === 0 ? now : next
+      if (i === 1) x += now / 2 + gap * 2 + next / 2
+      else if (i > 1) x += next + gap
+      const disc = this.add.circle(x, turnY, s / 2, 0x0a0918, 0.85).setStrokeStyle(i === 0 ? 3 * ui : 1.5 * ui, i === 0 ? 0xffe7ad : 0xe6c47a, i === 0 ? 1 : 0.35)
       const image = this.add.image(x, turnY + s * 0.36, textureKey(unit.creature)).setOrigin(0.5, 1).setFlipX(unit.side === 'enemy')
       image.setScale(Math.min((s - 6) / image.width, (s - 6) / image.height))
-      container.add([disc, image])
+      const side = this.add.rectangle(x, turnY + s / 2 + 5 * ui, s * 0.6, 3 * ui, SIDE_COLOR[unit.side])
+      const parts = [disc, image, side]
+      if (i > 0) parts.forEach((p) => p.setAlpha(0.65))
+      container.add(parts)
     })
-    container.add(
-      this.add.text(startX - size / 2 - 4, turnY + size / 2 + 6 + (ui > 1 ? 4 : 0), 'TURN ORDER', style({ fontFamily: DISPLAY, fontSize: px(11, ui), color: '#e6c47a' })),
-    )
   }
 }
