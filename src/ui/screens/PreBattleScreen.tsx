@@ -73,7 +73,6 @@ function ScoutStep({ encounter, enemy, rules, bestOf }: { encounter: Encounter; 
   const [info, setInfo] = useState<number | null>(null)
   const bossVows = bossVowsFor(save, encounter)
   const weak = weaknessesOf(enemy)
-  const counters = save.order.filter((id) => allowedIn(rules, id) && weak.includes(CONTENT.creatures[id].element))
   const shown = info !== null ? enemy[info] : null
 
   return (
@@ -138,11 +137,6 @@ function ScoutStep({ encounter, enemy, rules, bestOf }: { encounter: Encounter; 
                 </span>
               ))}
             </div>
-            <p className="mt-1 text-xs text-mist">
-              {counters.length > 0
-                ? `${counters.length} of your creatures strike${counters.length > 1 ? '' : 's'} this weakness: look for ▲ Counter when you pick your team.`
-                : 'None of your creatures strikes this weakness yet.'}
-            </p>
           </div>
         </section>
       )}
