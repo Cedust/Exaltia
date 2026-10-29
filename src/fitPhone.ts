@@ -16,13 +16,19 @@ export function fitPhone() {
   html.classList.toggle('phone', phone)
   if (!tooWide()) return
   document.querySelector('meta[name="viewport"]')?.setAttribute('content', `width=${window.screen.width}, initial-scale=1, viewport-fit=cover`)
+  // Only touch the root font size when the factor really changes. Resetting it first (even for a moment) shrinks
+  // the page, the browser clamps every scroll position to the shorter content, and lists jump back to the top;
+  // phones fire resize often (URL bar, keyboard), so that happened while scrolling.
+  let applied = ''
   const apply = () => {
-    html.style.removeProperty('font-size')
-    delete html.dataset.fitScale
-    if (!tooWide()) return
-    const scale = window.innerWidth / window.screen.width
-    html.style.fontSize = `${(phone ? 112.5 : 100) * scale}%`
-    html.dataset.fitScale = scale.toFixed(2)
+    const scale = tooWide() ? window.innerWidth / window.screen.width : 1
+    const value = scale === 1 ? '' : `${(phone ? 112.5 : 100) * scale}%`
+    if (value === applied) return
+    applied = value
+    if (value) html.style.fontSize = value
+    else html.style.removeProperty('font-size')
+    if (value) html.dataset.fitScale = scale.toFixed(2)
+    else delete html.dataset.fitScale
   }
   requestAnimationFrame(apply)
   window.addEventListener('resize', apply)

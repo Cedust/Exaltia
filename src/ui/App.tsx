@@ -12,6 +12,7 @@ import { CollectionView, CreatureScreen } from './screens/CollectionScreens'
 import { Hub, JournalView, MenuView, type HubTab } from './screens/HubScreens'
 import { MapView } from './screens/MapView'
 import { MatchScreen } from './screens/MatchScreen'
+import type { PrepStep } from './prepare'
 import { PreBattleScreen } from './screens/PreBattleScreen'
 import { RegionSheet } from './screens/RegionSheet'
 import { StarterScreen } from './screens/StarterScreen'
@@ -30,7 +31,8 @@ type Step =
   | { kind: 'hub' }
   | { kind: 'tournament'; regionId: string }
   | { kind: 'creature'; id: string }
-  | { kind: 'prebattle'; encounterId: string; back: Return }
+  /** `seed` keeps the match's Vow offers when the player steps back from round 1 to change the team. */
+  | { kind: 'prebattle'; encounterId: string; back: Return; step?: PrepStep; seed?: number }
   | { kind: 'match'; encounter: Encounter; match: DuelMatch; tier: number; back: Return; id: number }
   | { kind: 'result'; encounter: Encounter; report: BattleReport; back: Return }
   | { kind: 'choose'; regionId: string }
@@ -110,12 +112,12 @@ export default function App() {
     }
   }
 
-  const fight = (encounterId: string, back: Return) => {
+  const fight = (encounterId: string, back: Return, seed = newSeed()) => {
     if (!save) return
     const encounter = findAnyEncounter(save, encounterId)
     if (!encounter) return
     const rules = battleRules(save, encounter)
-    const match = startMatch(save, encounter, newSeed())
+    const match = startMatch(save, encounter, seed)
     setBattleId((n) => n + 1)
     play({ kind: 'match', encounter, match, tier: rules.tier, back, id: battleId + 1 })
   }
@@ -255,8 +257,10 @@ export default function App() {
           <div className="fixed inset-0">
             <PreBattleScreen
               encounter={encounter}
+              step={screen.step ?? 'scout'}
+              onStep={(step) => setScreen({ ...screen, step })}
               onBack={() => play(back.kind === 'tournament' ? { kind: 'tournament', regionId: back.regionId } : { kind: 'hub' })}
-              onFight={() => fight(screen.encounterId, back)}
+              onNext={() => fight(screen.encounterId, back, screen.seed)}
             />
           </div>
         )
@@ -271,6 +275,7 @@ export default function App() {
             onSpeed={(speed) => setSave((s) => (s ? { ...s, speed } : s))}
             onDone={(match, results) => finishMatch(screen, match, results)}
             onForfeit={() => play({ kind: 'prebattle', encounterId: screen.encounter.id, back: screen.back })}
+            onPrepare={(step) => play({ kind: 'prebattle', encounterId: screen.encounter.id, back: screen.back, step, seed: screen.match.seed })}
           />
         )
       case 'result':

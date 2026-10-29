@@ -1,4 +1,5 @@
 import { useMemo, type ReactNode } from 'react'
+import { createPortal } from 'react-dom'
 import { elementName } from '../core/log'
 import type { CreatureDef, Element } from '../core/types'
 import { ELEMENT_GLOW, ELEMENT_HEX, ELEMENT_TEXT, artUrl, backdropUrl } from './styles'
@@ -162,14 +163,18 @@ export function ScreenHeader({ title, subtitle, onBack, right }: { title: string
   )
 }
 
-/** Bottom sheet on phones, centered dialog on wide screens. */
+/**
+ * Bottom sheet on phones, centered dialog on wide screens. Rendered into the body, so a scrolling or animated
+ * screen around it can neither clip it nor cover it.
+ */
 export function Sheet({ children, onClose }: { children: ReactNode; onClose: () => void }) {
-  return (
+  return createPortal(
     <div className="fixed inset-0 z-40 flex items-end justify-center bg-black/60 backdrop-blur-[2px] sm:items-center" onClick={onClose}>
-      <div className="ornate fade-in max-h-[90dvh] w-full max-w-xl overflow-y-auto rounded-b-none p-4 sm:rounded-b-md safe-bottom" onClick={(e) => e.stopPropagation()}>
+      <div className="ornate sheet-up max-h-[90dvh] w-full max-w-xl overflow-y-auto overscroll-contain rounded-b-none p-4 sm:rounded-b-md safe-bottom" onClick={(e) => e.stopPropagation()}>
         {children}
       </div>
-    </div>
+    </div>,
+    document.body,
   )
 }
 

@@ -179,10 +179,15 @@ class UnitView {
       .text(0, top + 4, unit.name, style({ fontFamily: DISPLAY, fontSize: px(unit.boss ? 17 : 15, ui), color: css(element), fontStyle: 'bold', stroke: '#0a0918', strokeThickness: 4 * ui, align: 'center', wordWrap: { width: layout.nameWidth } }))
       .setOrigin(0.5, 0)
       .setLineSpacing(-4 * ui)
-    // Bars sit right under the name, which may have wrapped onto two lines.
-    const barsY = top + 4 + name.height + 4 * ui
+    // Every name gets room for two lines, so all bars line up whether a name wraps or not; a one-line name sits
+    // just above its bars.
+    const lines = Math.max(1, name.getWrappedText().length)
+    const lineH = (name.height + 4 * ui * (lines - 1)) / lines
+    const block = Math.max(name.height, lineH * 2 - 4 * ui)
+    name.setY(top + 4 + block - name.height)
+    const barsY = top + 4 + block + 4 * ui
     const bar = (yy: number, h: number, color: number) => {
-      const bg = scene.add.rectangle(-this.barWidth / 2, yy, this.barWidth, h, 0x05040c, 0.85).setOrigin(0, 0.5).setStrokeStyle(1, 0xe6c47a, 0.35)
+      const bg = scene.add.rectangle(-this.barWidth / 2, yy, this.barWidth, h, 0x05040c, 0.85).setOrigin(0, 0.5).setStrokeStyle(1, SIDE_COLOR[unit.side], 0.6)
       const fill = scene.add.rectangle(-this.barWidth / 2, yy, this.barWidth, h, color).setOrigin(0, 0.5)
       return [bg, fill] as const
     }
@@ -216,7 +221,10 @@ class UnitView {
   private drawRing(active: boolean) {
     const r = this.size * 0.42
     this.ring.clear()
-    this.ring.lineStyle(active ? 3 : 1.5, active ? 0xffe7ad : SIDE_COLOR[this.unit.side], active ? 1 : 0.55)
+    // The ground ring carries the side colour (blue yours, red theirs), filled so it reads at a glance.
+    this.ring.fillStyle(SIDE_COLOR[this.unit.side], active ? 0.28 : 0.2)
+    this.ring.fillEllipse(0, this.size * 0.42, r * 2, r * 0.55)
+    this.ring.lineStyle(active ? 3 : 2.5, active ? 0xffe7ad : SIDE_COLOR[this.unit.side], active ? 1 : 0.9)
     this.ring.strokeEllipse(0, this.size * 0.42, r * 2, r * 0.55)
     if (active) {
       this.ring.lineStyle(1, 0xffe7ad, 0.5)
@@ -696,26 +704,32 @@ export class BattleScene extends Phaser.Scene {
     if (!stay) this.tweens.add({ targets: group, alpha: 0, delay: 900 / speed, duration: 300 / speed, onComplete: () => group.destroy() })
   }
 
-  /** The visible Turn Order: current actor first, then the predicted next turns. */
+  /**
+   * The visible Turn Order, kept short: who acts now (large, gold ring), then the next three turns smaller and
+   * fainter. A thin bar under each portrait marks the side (blue yours, red theirs).
+   */
   private drawTurnOrder(ids: string[]) {
     const container = this.turnOrder!
     container.removeAll(true)
-    const { width, turnY, portrait, ui } = this.layout
-    const slots = portrait ? 8 : 9
-    const size = Math.round(46 * ui)
-    const gap = 8
-    const startX = width / 2 - ((slots - 1) * (size + gap)) / 2
-    ids.slice(0, slots).forEach((id, i) => {
+    const { width, turnY, ui } = this.layout
+    const now = Math.round(66 * ui)
+    const next = Math.round(46 * ui)
+    const gap = Math.round(10 * ui)
+    const shown = ids.slice(0, 4)
+    const total = now + (shown.length - 1) * (next + gap) + gap
+    let x = width / 2 - total / 2 + now / 2
+    shown.forEach((id, i) => {
       const unit = this.views.get(id)!.unit
-      const x = startX + i * (size + gap) + (i === 0 ? -4 : 0)
-      const s = i === 0 ? size + 10 : size
-      const disc = this.add.circle(x, turnY, s / 2, 0x0a0918, 0.85).setStrokeStyle(i === 0 ? 3 : 2, i === 0 ? 0xffe7ad : SIDE_COLOR[unit.side])
+      const s = i === 0 ? now : next
+      if (i === 1) x += now / 2 + gap * 2 + next / 2
+      else if (i > 1) x += next + gap
+      const disc = this.add.circle(x, turnY, s / 2, 0x0a0918, 0.85).setStrokeStyle(i === 0 ? 3 * ui : 1.5 * ui, i === 0 ? 0xffe7ad : 0xe6c47a, i === 0 ? 1 : 0.35)
       const image = this.add.image(x, turnY + s * 0.36, textureKey(unit.creature)).setOrigin(0.5, 1).setFlipX(unit.side === 'enemy')
       image.setScale(Math.min((s - 6) / image.width, (s - 6) / image.height))
-      container.add([disc, image])
+      const side = this.add.rectangle(x, turnY + s / 2 + 5 * ui, s * 0.6, 3 * ui, SIDE_COLOR[unit.side])
+      const parts = [disc, image, side]
+      if (i > 0) parts.forEach((p) => p.setAlpha(0.65))
+      container.add(parts)
     })
-    container.add(
-      this.add.text(startX - size / 2 - 4, turnY + size / 2 + 6 + (ui > 1 ? 4 : 0), 'TURN ORDER', style({ fontFamily: DISPLAY, fontSize: px(11, ui), color: '#e6c47a' })),
-    )
   }
 }

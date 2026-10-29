@@ -324,6 +324,23 @@ input.field { padding-right: 0.7rem; background: rgba(10, 9, 24, 0.75); }
 .fade-in { animation: fade-in 0.5s ease-out both; }
 @keyframes fade-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
 
+/* Steps of the preparation flow slide in from the side they come from. */
+.step-in-next { animation: step-in-next 0.32s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+.step-in-prev { animation: step-in-prev 0.32s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+@keyframes step-in-next { from { opacity: 0; transform: translateX(2rem); } to { opacity: 1; transform: none; } }
+@keyframes step-in-prev { from { opacity: 0; transform: translateX(-2rem); } to { opacity: 1; transform: none; } }
+
+/* Bottom sheets rise from the bottom edge. */
+.sheet-up { animation: sheet-up 0.28s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+@keyframes sheet-up { from { transform: translateY(100%); } to { transform: none; } }
+
+/* The button that starts a fight breathes. */
+.fight-ready { animation: fight-ready 2.2s ease-in-out infinite; }
+@keyframes fight-ready {
+  0%, 100% { box-shadow: 0 0 0 1px #6d5223, 0 0 18px rgba(255, 210, 120, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.6); }
+  50% { box-shadow: 0 0 0 1px #6d5223, 0 0 38px rgba(255, 210, 120, 0.75), inset 0 1px 0 rgba(255, 255, 255, 0.6); }
+}
+
 .rise-in { animation: rise-in 0.9s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
 @keyframes rise-in { from { opacity: 0; transform: translateY(30px) scale(0.96); } to { opacity: 1; transform: none; } }
 
@@ -379,5 +396,5 @@ html.phone .bleed {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .mote, .stars, .spin-slow, .spin-rev, .float, .pulse-glow, .shimmer-text, .map-pin .ring { animation: none !important; }
+  .mote, .stars, .spin-slow, .spin-rev, .float, .pulse-glow, .shimmer-text, .map-pin .ring, .step-in-next, .step-in-prev, .sheet-up, .fight-ready { animation: none !important; }
 }
