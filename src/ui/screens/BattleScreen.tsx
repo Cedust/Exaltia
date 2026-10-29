@@ -77,7 +77,7 @@ export function BattleScreen({
 
   return (
     <div className="fixed inset-0 flex flex-col bg-night">
-      <div className="relative z-10 flex items-center gap-1.5 border-b border-gold/20 bg-night/85 px-3 py-2 backdrop-blur">
+      <div className="relative z-10 flex items-center safe-top gap-1.5 border-b border-gold/20 bg-night/85 px-3 pb-2 backdrop-blur">
         <div className="min-w-0 flex-1">
           <div className="truncate font-display text-base tracking-[0.08em] text-gold-bright">{encounter.name}</div>
           <div className="truncate text-sm text-mist">vs {encounter.opponent}</div>

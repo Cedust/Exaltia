@@ -219,7 +219,7 @@ function PickView({ match: initial, onFight, onForfeit }: { match: DuelMatch; on
         subtitle={`${match.name} · best of ${match.bestOf}`}
         onBack={() => setLeaving(true)}
       />
-      <div className="mx-auto max-w-3xl px-4">
+      <div className="mx-auto max-w-3xl px-3">
         {leaving && (
           <div className="ornate-soft mt-3 p-3 text-center fade-in">
             <p className="text-sm text-mist">Leave the match? It ends without a result and you can start it again.</p>
@@ -314,7 +314,7 @@ function PickView({ match: initial, onFight, onForfeit }: { match: DuelMatch; on
           onChange={(player) => setMatch((m) => ({ ...m, player }))}
         />
 
-        <div className="mt-5 grid grid-cols-2 gap-3 rounded border border-gold/15 bg-night/50 p-3">
+        <div className="bleed mt-5 grid grid-cols-2 gap-3 rounded border border-gold/15 bg-night/50 p-4">
           <VowList title="Your Vows" vows={match.vows.player} slots={match.player} />
           <VowList title="Their Vows" vows={match.vows.enemy} slots={match.enemy} />
         </div>

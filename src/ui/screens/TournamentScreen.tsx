@@ -18,7 +18,7 @@ export function TournamentScreen({ regionId, onBack, onPrepare }: { regionId: st
     <div className="relative min-h-full pb-10">
       <Ambience backdrop={regionId} dim={0.45} />
       <ScreenHeader title={region.tournament.name} subtitle={`${region.name} Tournament`} onBack={onBack} />
-      <div className="mx-auto max-w-xl px-4 pt-4">
+      <div className="mx-auto max-w-xl px-3 pt-4">
         <div className="flex justify-center">
           <ElementLabel element={region.element} />
         </div>

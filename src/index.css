@@ -61,6 +61,19 @@ html {
   -webkit-tap-highlight-color: transparent;
 }
 
+/* Phones: every rem (type, spacing, tap targets) grows by an eighth, so the game reads like a native app
+   at arm's length instead of a shrunken web page. */
+@media (max-width: 639px) {
+  html { font-size: 112.5%; }
+}
+
+/* Feel like an app, not a page: no double-tap zoom delay, no text selection on controls. */
+button, a, [role='button'] {
+  touch-action: manipulation;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
 body {
   background: var(--color-night);
   color: var(--color-ivory);
@@ -332,6 +345,18 @@ input.field { padding-right: 0.7rem; background: rgba(10, 9, 24, 0.75); }
 .scrollbar-none::-webkit-scrollbar { display: none; }
 
 .safe-bottom { padding-bottom: max(0.75rem, env(safe-area-inset-bottom)); }
+.safe-top { padding-top: max(0.625rem, env(safe-area-inset-top)); }
+
+/* Edge to edge on phones: a panel inside a px-3 column drops its side margins, borders and corners,
+   like a grouped list in a native app. Wider screens keep the framed card. */
+@media (max-width: 639px) {
+  .bleed {
+    margin-inline: -0.75rem;
+    border-radius: 0 !important;
+    border-left-width: 0 !important;
+    border-right-width: 0 !important;
+  }
+}
 
 @media (prefers-reduced-motion: reduce) {
   .mote, .stars, .spin-slow, .spin-rev, .float, .pulse-glow, .shimmer-text, .map-pin .ring { animation: none !important; }

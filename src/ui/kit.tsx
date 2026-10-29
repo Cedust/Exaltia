@@ -145,7 +145,7 @@ export function Bar({ value, max, color = '#e6c47a', className = '' }: { value: 
 /** Screen header with a back button and a centered title. */
 export function ScreenHeader({ title, subtitle, onBack, right }: { title: string; subtitle?: string; onBack?: () => void; right?: ReactNode }) {
   return (
-    <header className="sticky top-0 z-20 flex min-h-16 items-center gap-3 border-b border-gold/20 bg-night/80 px-3 py-2.5 backdrop-blur-md">
+    <header className="safe-top sticky top-0 z-20 flex min-h-16 items-center gap-3 border-b border-gold/20 bg-night/80 px-3 pb-2.5 backdrop-blur-md">
       {onBack ? (
         <button type="button" className="btn-icon shrink-0" onClick={onBack} aria-label="Back">
           ‹

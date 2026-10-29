@@ -93,7 +93,7 @@ export function PreBattleScreen({ encounter, onBack, onFight }: { encounter: Enc
                 Best of {bestOf}: win {Math.ceil(bestOf / 2)} round{bestOf > 1 ? 's' : ''}. Before every round {encounter.opponent} swears a Vow first, then you answer with
                 one of yours.
               </p>
-              <div className="ornate-soft p-2">
+              <div className="ornate-soft bleed px-2 py-3">
                 <FormationGrid player={save.formation} enemy={enemy} opponent={encounter.opponent} preview={preview} />
               </div>
               {enemyWeakness.length > 0 && (
@@ -107,7 +107,7 @@ export function PreBattleScreen({ encounter, onBack, onFight }: { encounter: Enc
                   ))}
                 </p>
               )}
-              <div className="ornate-soft p-3">
+              <div className="ornate-soft bleed p-4">
                 <div className="label-caps !text-2xs">Favourite Vows · {theme.theme}</div>
                 <div className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-xs">
                   {theme.prefers.map((id) => (
@@ -139,7 +139,7 @@ export function PreBattleScreen({ encounter, onBack, onFight }: { encounter: Enc
                 Choose {rules.teamSize} creature{rules.teamSize > 1 ? 's' : ''}. The team is locked for the whole match, but you may re-form it before every
                 round. A Front creature protects the Back creature in its own Lane, and attacks go to their own Lane first.
               </p>
-              <div className="ornate-soft p-2">
+              <div className="ornate-soft bleed px-2 py-3">
                 <FormationGrid player={save.formation} enemy={enemy} opponent={encounter.opponent} preview={preview} onChange={setFormation} />
               </div>
               <div>
@@ -193,7 +193,7 @@ function EnemyCard({ member }: { member: MatchMember }) {
   const stats = member.loadout.stats ?? creature.stats
   const skills = member.loadout.skills ?? creature.skills
   return (
-    <div className={`ornate-soft p-3 ${member.boss ? '!border-gold/60' : ''}`}>
+    <div className={`ornate-soft bleed p-4 ${member.boss ? '!border-gold/60' : ''}`}>
       <div className="flex gap-3">
         <CreatureArt creature={creature} flip className="h-20 w-20 shrink-0" />
         <div className="min-w-0 flex-1">

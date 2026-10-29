@@ -103,7 +103,7 @@ export function CreatureScreen({ creatureId, onBack }: { creatureId: string; onB
     <div className="relative min-h-full pb-10">
       <Ambience dim={0.7} motes={8} />
       <ScreenHeader title={creature.name} subtitle={creature.title ?? creature.role} onBack={onBack} />
-      <div className="mx-auto max-w-2xl px-4">
+      <div className="mx-auto max-w-2xl px-3">
         <div className="relative mt-3 flex flex-col items-center">
           <div className="absolute inset-x-0 top-6 mx-auto h-48 w-48 rounded-full blur-3xl" style={{ background: `${ELEMENT_HEX[creature.element]}33` }} />
           <CreatureArt creature={creature} className="float relative h-56 w-56" />
@@ -114,7 +114,7 @@ export function CreatureScreen({ creatureId, onBack }: { creatureId: string; onB
           {creature.lore && <p className="lore mt-2 max-w-md text-center text-base text-mist">{creature.lore}</p>}
         </div>
 
-        <div className="ornate-soft mt-4 space-y-2 p-3">
+        <div className="ornate-soft bleed mt-4 space-y-2 p-4">
           {paragon ? (
             <div>
               <div className="flex items-baseline justify-between">
@@ -130,7 +130,7 @@ export function CreatureScreen({ creatureId, onBack }: { creatureId: string; onB
         </div>
 
         {paragon && (
-          <div className="mt-4 flex overflow-hidden rounded-md border border-gold/30">
+          <div className="bleed mt-4 flex overflow-hidden rounded-md border border-gold/30">
             {(['skills', 'tree', 'oath'] as const).map((t) => (
               <button key={t} type="button" onClick={() => setTab(t)} className={`min-h-11 flex-1 py-2 font-display text-xs tracking-[0.12em] ${tab === t ? 'bg-gold/20 text-gold-bright' : 'text-mist'}`}>
                 {t === 'skills' ? 'SKILLS' : t === 'tree' ? `SKILL TREE${treeState(owned).available > 0 ? ` (${treeState(owned).available})` : ''}` : `OATH ${ROMAN[oathRank(owned)]}`}
@@ -146,7 +146,7 @@ export function CreatureScreen({ creatureId, onBack }: { creatureId: string; onB
               const uses = owned.mastery[id] ?? 0
               const stars = masteryOf(uses)
               return (
-                <div key={id} className="ornate-soft p-2.5">
+                <div key={id} className="ornate-soft bleed px-4 py-3">
                   <div className="flex items-baseline justify-between gap-2">
                     <span className="font-display text-sm text-gold">{def.name}</span>
                     {paragon && <Stars value={stars} />}
@@ -162,7 +162,7 @@ export function CreatureScreen({ creatureId, onBack }: { creatureId: string; onB
               )
             })}
             {creature.ascension && (
-              <div className="ornate p-2.5">
+              <div className="ornate bleed px-4 py-3">
                 <div className="label-caps !text-2xs">Ascension</div>
                 <span className="font-display text-sm text-gold-bright">✦ {(loadout.skillDefs?.[creature.ascension] ?? CONTENT.skills[creature.ascension]).name}</span>
                 <p className="text-xs text-ivory/85">{describeSkill(loadout.skillDefs?.[creature.ascension] ?? CONTENT.skills[creature.ascension])}</p>
@@ -204,7 +204,7 @@ function SkillTreeView({ owned, setOwned }: { owned: OwnedCreature; setOwned: (c
       <p className="mt-1 px-1 text-xs text-mist">Each Awakening level gives 1 point. Nodes cost 1, Capstones 2. Resetting is free: try builds against each opponent.</p>
       <div className="mt-3 grid gap-3 sm:grid-cols-3">
         {tree.map((path, p) => (
-          <div key={path.name} className="ornate-soft p-2.5">
+          <div key={path.name} className="ornate-soft bleed p-3">
             <div className="text-center">
               <div className="font-display text-sm tracking-wider text-gold-bright">{path.name}</div>
               <div className="label-caps !text-2xs">{path.theme}</div>
@@ -282,7 +282,7 @@ function OathView({
 
   return (
     <div className="mt-3 space-y-3">
-      <div className="ornate p-3 text-center">
+      <div className="ornate bleed p-4 text-center">
         <div className="label-caps">Oath Rank</div>
         <div className="title-display text-5xl">{ROMAN[rank]}</div>
         <Bar value={owned.oath - rank * SHARDS_PER_RANK} max={rank >= MAX_OATH_RANK ? 0.0001 : SHARDS_PER_RANK} className="mx-auto mt-2 max-w-xs" />

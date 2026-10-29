@@ -13,12 +13,45 @@ import { ELEMENT_HEX, RARITY_STYLE, characterUrl } from '../styles'
 
 export type HubTab = 'map' | 'collection' | 'journal' | 'menu'
 
-const TABS: { id: HubTab; label: string; icon: string }[] = [
-  { id: 'map', label: 'World', icon: '✧' },
-  { id: 'collection', label: 'Creatures', icon: '❖' },
-  { id: 'journal', label: 'Journal', icon: '❦' },
-  { id: 'menu', label: 'Menu', icon: '☰' },
+const TABS: { id: HubTab; label: string }[] = [
+  { id: 'map', label: 'World' },
+  { id: 'collection', label: 'Creatures' },
+  { id: 'journal', label: 'Journal' },
+  { id: 'menu', label: 'Menu' },
 ]
+
+/** Line icons for the tab bar, drawn in the current text colour. */
+function TabIcon({ tab, active }: { tab: HubTab; active: boolean }) {
+  const fill = active ? 'currentColor' : 'none'
+  return (
+    <svg viewBox="0 0 24 24" className="h-7 w-7" fill="none" stroke="currentColor" strokeWidth={1.7} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      {tab === 'map' && (
+        <>
+          <path d="M3 6.5 9 4l6 2.5L21 4v13.5L15 20l-6-2.5L3 20Z" fill={active ? 'currentColor' : 'none'} fillOpacity={0.18} />
+          <path d="M9 4v13.5M15 6.5V20" />
+        </>
+      )}
+      {tab === 'collection' && (
+        <>
+          <path d="M12 2.5 14.6 9 21 12l-6.4 3L12 21.5 9.4 15 3 12l6.4-3Z" fill={fill} fillOpacity={0.25} />
+          <circle cx="12" cy="12" r="2" fill="currentColor" />
+        </>
+      )}
+      {tab === 'journal' && (
+        <>
+          <path d="M5 4.5A1.5 1.5 0 0 1 6.5 3H19v15H6.5A1.5 1.5 0 0 0 5 19.5Z" fill={fill} fillOpacity={0.18} />
+          <path d="M5 19.5A1.5 1.5 0 0 0 6.5 21H19v-3M9 7.5h6M9 11h4" />
+        </>
+      )}
+      {tab === 'menu' && (
+        <>
+          <circle cx="12" cy="12" r="3" fill={fill} fillOpacity={0.3} />
+          <path d="M12 2.8v2.4M12 18.8v2.4M2.8 12h2.4M18.8 12h2.4M5.5 5.5l1.7 1.7M16.8 16.8l1.7 1.7M5.5 18.5l1.7-1.7M16.8 7.2l1.7-1.7" />
+        </>
+      )}
+    </svg>
+  )
+}
 
 /** The frame around the map, collection and journal: a HUD on top and thumb-friendly tabs below. */
 export function Hub({ tab, onTab, children }: { tab: HubTab; onTab: (tab: HubTab) => void; children: ReactNode }) {
@@ -27,33 +60,38 @@ export function Hub({ tab, onTab, children }: { tab: HubTab; onTab: (tab: HubTab
   const title = save.tournamentOrder.length > 0 ? 'Sigilbearer' : 'Unsworn'
   return (
     <div className="fixed inset-0 flex flex-col">
-      <header className="relative z-20 flex items-center gap-3 border-b border-gold/25 bg-night/85 px-3 py-2.5 backdrop-blur-md">
-        <Sigil size={40} glow={false} className="shrink-0" />
+      <header className="safe-top relative z-20 flex items-center gap-3 border-b border-gold/25 bg-night/85 px-4 pb-3 backdrop-blur-md">
+        <Sigil size={44} glow={false} className="shrink-0" />
         <div className="min-w-0 flex-1">
-          <div className="truncate font-display text-base tracking-[0.12em] text-gold-bright">{save.name}</div>
+          <div className="truncate font-display text-lg font-bold tracking-[0.1em] text-gold-bright">{save.name}</div>
           <div className="truncate text-sm text-mist">
             {title} · {ACT_NAMES[act]}
           </div>
         </div>
-        <div className="flex items-center gap-1 rounded-full border border-gold/35 bg-black/40 px-3 py-1.5 font-display text-base text-gold-bright" title="Oath Shards">
-          <ShardIcon /> {save.shards}
+        <div className="flex items-center gap-1 rounded-full border border-gold/35 bg-black/40 px-3.5 py-2 font-display text-lg text-gold-bright" title="Oath Shards">
+          <ShardIcon className="!h-5 !w-5" /> {save.shards}
         </div>
       </header>
       <main className="relative flex-1 overflow-y-auto overflow-x-hidden">{children}</main>
-      <nav className="relative z-20 grid grid-cols-4 border-t border-gold/25 bg-night/90 backdrop-blur-md safe-bottom">
-        {TABS.map((t) => (
-          <button
-            key={t.id}
-            type="button"
-            onClick={() => onTab(t.id)}
-            aria-current={tab === t.id ? 'page' : undefined}
-            className={`relative flex min-h-16 flex-col items-center justify-center gap-1 pt-2 transition ${tab === t.id ? 'text-gold-bright' : 'text-mist'}`}
-          >
-            {tab === t.id && <span className="absolute inset-x-5 top-0 h-0.5 rounded-full bg-gold shadow-[0_0_10px_rgba(255,220,150,0.8)]" />}
-            <span className={`text-2xl leading-none ${tab === t.id ? 'drop-shadow-[0_0_8px_rgba(255,220,150,0.8)]' : ''}`}>{t.icon}</span>
-            <span className="font-display text-xs font-bold tracking-[0.06em]">{t.label}</span>
-          </button>
-        ))}
+      {/* A native-style tab bar: big icons with a pill behind the active one, labels in the sans face. */}
+      <nav className="relative z-20 grid grid-cols-4 border-t border-gold/20 bg-[#0d0b20]/95 px-1 pt-2 backdrop-blur-md safe-bottom">
+        {TABS.map((t) => {
+          const active = tab === t.id
+          return (
+            <button
+              key={t.id}
+              type="button"
+              onClick={() => onTab(t.id)}
+              aria-current={active ? 'page' : undefined}
+              className={`flex min-h-[4.25rem] flex-col items-center justify-start gap-1 transition-colors ${active ? 'text-gold-bright' : 'text-mist'}`}
+            >
+              <span className={`flex h-9 w-16 items-center justify-center rounded-full transition-colors ${active ? 'bg-gold/20 shadow-[0_0_16px_rgba(230,196,122,0.25)]' : ''}`}>
+                <TabIcon tab={t.id} active={active} />
+              </span>
+              <span className={`text-sm leading-none ${active ? 'font-bold' : 'font-medium'}`}>{t.label}</span>
+            </button>
+          )
+        })}
       </nav>
     </div>
   )
@@ -68,7 +106,7 @@ const ELEMENT_PAIRS: [Element, Element][] = [
 
 function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
-    <section className="ornate-soft p-3">
+    <section className="ornate-soft bleed p-4">
       <h2 className="font-display text-base tracking-[0.15em] text-gold-bright">{title}</h2>
       <div className="mt-2">{children}</div>
     </section>
@@ -80,7 +118,7 @@ export function JournalView() {
   const { save } = useGame()
   const memories = Math.min(tournamentsWon(save), OATH_MEMORIES.length)
   return (
-    <div className="mx-auto max-w-2xl space-y-3 px-3 pb-6 pt-4">
+    <div className="mx-auto max-w-2xl space-y-3 px-3 pb-6 pt-3">
       <Section title="Oath Memories">
         {memories === 0 ? (
           <p className="lore text-base text-mist">Every Paragon who swears the Oath shares a memory of the night the Spire broke. You have none yet.</p>
@@ -178,7 +216,7 @@ export function MenuView({ onReplayScene, onQuit, onDelete }: { onReplayScene: (
   const { save, update } = useGame()
   const [confirm, setConfirm] = useState(false)
   return (
-    <div className="mx-auto max-w-md space-y-3 px-3 pb-6 pt-4">
+    <div className="mx-auto max-w-md space-y-3 px-3 pb-6 pt-3">
       <Section title="Journey">
         <div className="grid grid-cols-2 gap-2 text-sm text-mist">
           <span>Battles fought</span>
