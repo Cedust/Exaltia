@@ -17,7 +17,7 @@ export function StarterScreen({ onDone }: { onDone: (picks: string[]) => void })
     setPicks((p) => (p.includes(id) ? p.filter((x) => x !== id) : p.length >= 2 ? [p[1], id] : [...p, id]))
 
   return (
-    <div className="relative min-h-full px-4 pb-28 pt-8">
+    <div className="relative min-h-full px-4 pb-40 pt-8">
       <Ambience backdrop="spire" dim={0.55} />
       <div className="mx-auto max-w-3xl text-center">
         <p className="label-caps">Prologue</p>
@@ -42,7 +42,7 @@ export function StarterScreen({ onDone }: { onDone: (picks: string[]) => void })
               <span className="mt-2 text-center text-xs leading-snug text-ivory/80">{HINTS[id]}</span>
               <div className="mt-2 w-full space-y-1 border-t border-gold/15 pt-2">
                 {creature.skills.map((s) => (
-                  <div key={s} className="text-[0.7rem] leading-tight">
+                  <div key={s} className="text-xs leading-tight">
                     <span className="text-gold">{CONTENT.skills[s].name}</span>
                     <span className="block text-mist">{describeSkill(CONTENT.skills[s])}</span>
                   </div>

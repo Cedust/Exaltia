@@ -46,17 +46,17 @@ export function MapView({ save, onRegion, onSpire }: { save: SaveState; onRegion
                 style={{ left: `${region.x}%`, top: `${region.y}%` }}
                 onClick={() => onRegion(region.id)}
               >
-                <span className="relative flex h-9 w-9 items-center justify-center">
+                <span className="relative flex h-11 w-11 items-center justify-center">
                   {open && !won && <span className="ring absolute inset-0 rounded-full border-2" style={{ borderColor: ELEMENT_HEX[region.element] }} />}
                   <span
-                    className="flex h-8 w-8 items-center justify-center rounded-full border-2 bg-night/85 shadow-lg"
+                    className="flex h-10 w-10 items-center justify-center rounded-full border-2 bg-night/85 shadow-lg"
                     style={{ borderColor: open ? ELEMENT_HEX[region.element] : '#555', boxShadow: open ? `0 0 16px ${ELEMENT_HEX[region.element]}` : 'none' }}
                   >
                     {won ? <span className="text-sm text-gold-bright">✦</span> : open ? <ElementGem element={region.element} /> : <span className="text-xs text-white/40">🔒</span>}
                   </span>
                 </span>
                 <span
-                  className={`mt-1 whitespace-nowrap rounded-sm px-2 py-0.5 font-display text-[0.68rem] tracking-[0.12em] shadow ${open ? 'bg-night/80 text-gold-bright' : 'bg-night/70 text-white/45'}`}
+                  className={`mt-1 whitespace-nowrap rounded-sm px-2 py-1 font-display text-sm tracking-[0.08em] shadow ${open ? 'bg-night/80 text-gold-bright' : 'bg-night/70 text-white/45'}`}
                 >
                   {region.name}
                 </span>
@@ -66,9 +66,9 @@ export function MapView({ save, onRegion, onSpire }: { save: SaveState; onRegion
 
         {/* The Spire in the center */}
         <button type="button" className="map-pin flex flex-col items-center" style={{ left: `${SPIRE.x}%`, top: `${SPIRE.y}%` }} onClick={onSpire}>
-          <span className="relative flex h-12 w-12 items-center justify-center">
+          <span className="relative flex h-14 w-14 items-center justify-center">
             {action && <span className="ring absolute inset-0 rounded-full border-2 border-gold" />}
-            <span className="flex h-11 w-11 items-center justify-center overflow-hidden rounded-full border-2 border-gold bg-night/90 shadow-[0_0_24px_rgba(255,220,150,0.6)]">
+            <span className="flex h-13 w-13 items-center justify-center overflow-hidden rounded-full border-2 border-gold bg-night/90 shadow-[0_0_24px_rgba(255,220,150,0.6)]">
               {action === 'duel' || action === 'finale' ? (
                 <img src={characterUrl('cassian')} alt="" className="h-full w-full object-cover object-top" />
               ) : action === 'trial' ? (
@@ -78,7 +78,7 @@ export function MapView({ save, onRegion, onSpire }: { save: SaveState; onRegion
               )}
             </span>
           </span>
-          <span className="mt-1 whitespace-nowrap rounded-sm bg-night/85 px-2 py-0.5 font-display text-[0.7rem] tracking-[0.12em] text-gold-bright">
+          <span className="mt-1 whitespace-nowrap rounded-sm bg-night/85 px-2 py-1 font-display text-sm tracking-[0.08em] text-gold-bright">
             {action === 'trial' ? 'The First Trial' : action === 'duel' ? 'Cassian awaits' : action === 'finale' ? 'The Spire Reforged' : SPIRE.name}
           </span>
         </button>

@@ -74,14 +74,14 @@ export function Sigil({ size = 220, className = '', glow = true }: { size?: numb
   )
 }
 
-export function Divider({ children }: { children?: ReactNode }) {
-  return <div className="divider label-caps">{children ?? '◆'}</div>
+export function Divider({ children, className = '' }: { children?: ReactNode; className?: string }) {
+  return <div className={`divider label-caps ${className}`}>{children ?? '◆'}</div>
 }
 
 export function ElementGem({ element, className = '' }: { element: Element; className?: string }) {
   return (
     <span
-      className={`inline-block h-2.5 w-2.5 rotate-45 ${className}`}
+      className={`inline-block h-3 w-3 shrink-0 rotate-45 ${className}`}
       style={{ background: ELEMENT_HEX[element], boxShadow: `0 0 8px ${ELEMENT_HEX[element]}` }}
       title={elementName(element)}
     />
@@ -90,7 +90,7 @@ export function ElementGem({ element, className = '' }: { element: Element; clas
 
 export function ElementLabel({ element }: { element: Element }) {
   return (
-    <span className={`inline-flex items-center gap-1.5 font-display text-[0.65rem] tracking-[0.18em] uppercase ${ELEMENT_TEXT[element]}`}>
+    <span className={`inline-flex items-center gap-1.5 font-display text-xs tracking-[0.16em] uppercase ${ELEMENT_TEXT[element]}`}>
       <ElementGem element={element} />
       {elementName(element)}
     </span>
@@ -145,19 +145,19 @@ export function Bar({ value, max, color = '#e6c47a', className = '' }: { value: 
 /** Screen header with a back button and a centered title. */
 export function ScreenHeader({ title, subtitle, onBack, right }: { title: string; subtitle?: string; onBack?: () => void; right?: ReactNode }) {
   return (
-    <header className="sticky top-0 z-20 flex items-center gap-3 border-b border-gold/20 bg-night/80 px-3 py-2.5 backdrop-blur-md">
+    <header className="safe-top sticky top-0 z-20 flex min-h-16 items-center gap-3 border-b border-gold/20 bg-night/80 px-3 pb-2.5 backdrop-blur-md">
       {onBack ? (
         <button type="button" className="btn-icon shrink-0" onClick={onBack} aria-label="Back">
           ‹
         </button>
       ) : (
-        <span className="w-9" />
+        <span className="w-11" />
       )}
       <div className="min-w-0 flex-1 text-center">
-        <h1 className="truncate font-display text-base tracking-[0.12em] text-gold-bright">{title}</h1>
-        {subtitle && <p className="truncate text-xs text-mist">{subtitle}</p>}
+        <h1 className="truncate font-display text-lg tracking-[0.1em] text-gold-bright">{title}</h1>
+        {subtitle && <p className="truncate text-sm text-mist">{subtitle}</p>}
       </div>
-      <div className="flex min-w-9 shrink-0 justify-end">{right}</div>
+      <div className="flex min-w-11 shrink-0 justify-end">{right}</div>
     </header>
   )
 }
@@ -166,7 +166,7 @@ export function ScreenHeader({ title, subtitle, onBack, right }: { title: string
 export function Sheet({ children, onClose }: { children: ReactNode; onClose: () => void }) {
   return (
     <div className="fixed inset-0 z-40 flex items-end justify-center bg-black/60 backdrop-blur-[2px] sm:items-center" onClick={onClose}>
-      <div className="ornate fade-in max-h-[88vh] w-full max-w-xl overflow-y-auto rounded-b-none p-4 sm:rounded-b-md safe-bottom" onClick={(e) => e.stopPropagation()}>
+      <div className="ornate fade-in max-h-[90dvh] w-full max-w-xl overflow-y-auto rounded-b-none p-4 sm:rounded-b-md safe-bottom" onClick={(e) => e.stopPropagation()}>
         {children}
       </div>
     </div>

@@ -10,9 +10,11 @@ import { ELEMENT_TEXT } from './styles'
  * Tap one of your creatures, then a cell, to move it (or swap). Arrows show who attacks whom first.
  */
 
-// Five equal columns: your Back, your Front, the Lane names, their Front, their Back.
-const COLUMN: Record<Side, Record<Row, number>> = { player: { back: 0, front: 1 }, enemy: { front: 3, back: 4 } }
-const center = (side: Side, slot: DuelSlot) => ({ x: COLUMN[side][slot.row] * 20 + 10, y: slot.lane * 33.33 + 16.67 })
+// Five columns: your Back, your Front, a narrow one for the Lane names, their Front, their Back.
+// COLUMNS sets the grid; CENTER is the middle of each creature column in percent, for the arrows.
+const COLUMNS = 'grid-cols-[23fr_23fr_8fr_23fr_23fr]'
+const CENTER: Record<Side, Record<Row, number>> = { player: { back: 11.5, front: 34.5 }, enemy: { front: 65.5, back: 88.5 } }
+const center = (side: Side, slot: DuelSlot) => ({ x: CENTER[side][slot.row], y: slot.lane * 33.33 + 16.67 })
 
 export function FormationGrid<T extends DuelSlot>({
   player,
@@ -54,17 +56,17 @@ export function FormationGrid<T extends DuelSlot>({
         disabled={!editable}
         onClick={() => tap(lane, row)}
         aria-label={`${side === 'player' ? 'Your' : 'Their'} ${LANE_NAMES[lane]} ${row}${creature ? `: ${creature.name}` : ''}`}
-        className={`relative flex h-[4.6rem] flex-col items-center justify-center rounded-md border transition ${
+        className={`relative flex h-24 min-w-0 flex-col items-center justify-center rounded-md border transition ${
           isSelected ? 'border-gold bg-gold/20 shadow-[0_0_16px_rgba(230,196,122,0.4)]' : target ? 'border-gold/50 border-dashed bg-gold/5' : 'border-gold/10 bg-black/25'
         } ${row === 'front' ? 'bg-white/[0.03]' : ''}`}
       >
         {creature ? (
           <>
-            <CreatureArt creature={creature} className="h-11 w-11" halo={false} flip={side === 'enemy'} />
-            <span className={`w-full truncate px-0.5 text-center text-[0.58rem] font-bold leading-tight ${ELEMENT_TEXT[creature.element]}`}>{creature.name}</span>
+            <CreatureArt creature={creature} className="h-14 w-14" halo={false} flip={side === 'enemy'} />
+            <span className={`line-clamp-2 w-full px-0.5 text-center text-2xs font-bold leading-tight ${ELEMENT_TEXT[creature.element]}`}>{creature.name}</span>
             {slot.row === 'back' && preview && (
               <span
-                className={`absolute top-0.5 text-[0.6rem] ${side === 'player' ? 'left-1' : 'right-1'} ${open ? 'text-red-300' : 'text-gold/80'}`}
+                className={`absolute top-0.5 text-xs ${side === 'player' ? 'left-1' : 'right-1'} ${open ? 'text-red-300' : 'text-gold/80'}`}
                 title={open ? 'Open: no Front ally guards this Lane' : 'Protected by the Front ally in its Lane'}
               >
                 {open ? '◇' : '◆'}
@@ -72,7 +74,7 @@ export function FormationGrid<T extends DuelSlot>({
             )}
           </>
         ) : (
-          <span className="text-[0.55rem] uppercase tracking-widest text-mist/30">{row}</span>
+          <span className="text-2xs uppercase tracking-widest text-mist/30">{row}</span>
         )}
       </button>
     )
@@ -80,18 +82,23 @@ export function FormationGrid<T extends DuelSlot>({
 
   return (
     <div className="space-y-1">
-      <div className="grid grid-cols-5 gap-1 text-center">
-        <span className="label-caps col-span-2 !text-[0.55rem]">You · Back · Front</span>
+      <div className={`grid ${COLUMNS} gap-1 text-center`}>
+        <span className="label-caps col-span-2 !text-2xs">You</span>
         <span />
-        <span className="label-caps col-span-2 truncate !text-[0.55rem]">Front · Back · {opponent}</span>
+        <span className="label-caps col-span-2 truncate !text-2xs">{opponent}</span>
+        <span className="text-2xs uppercase tracking-widest text-mist/70">Back</span>
+        <span className="text-2xs uppercase tracking-widest text-mist/70">Front</span>
+        <span />
+        <span className="text-2xs uppercase tracking-widest text-mist/70">Front</span>
+        <span className="text-2xs uppercase tracking-widest text-mist/70">Back</span>
       </div>
       <div className="relative">
-        <div className="grid grid-cols-5 gap-1">
+        <div className={`grid ${COLUMNS} gap-1`}>
           {LANES.map((lane) => [
             cell('player', lane, 'back'),
             cell('player', lane, 'front'),
             <div key={`name-${lane}`} className="flex items-center justify-center">
-              <span className="font-display text-[0.6rem] uppercase tracking-[0.18em] text-gold/60">{LANE_NAMES[lane]}</span>
+              <span className="font-display text-2xs uppercase tracking-[0.18em] text-gold/60 [writing-mode:vertical-rl] rotate-180">{LANE_NAMES[lane]}</span>
             </div>,
             cell('enemy', lane, 'front'),
             cell('enemy', lane, 'back'),
@@ -136,8 +143,8 @@ export function FormationGrid<T extends DuelSlot>({
         )}
       </div>
       {preview && (
-        <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-0.5 text-[0.62rem] text-mist">
-          <button type="button" className="text-gold underline-offset-2 hover:underline" onClick={() => setShowArrows((v) => !v)}>
+        <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-xs text-mist">
+          <button type="button" className="min-h-11 px-2 text-gold underline underline-offset-4" onClick={() => setShowArrows((v) => !v)}>
             {showArrows ? 'Hide targets' : 'Show targets'}
           </button>
           <span>
@@ -148,7 +155,7 @@ export function FormationGrid<T extends DuelSlot>({
           </span>
         </div>
       )}
-      {onChange && <p className="text-center text-[0.62rem] text-mist/80">Tap a creature, then a cell to move it there (or swap).</p>}
+      {onChange && <p className="text-center text-xs text-mist/80">Tap a creature, then a cell to move it there (or swap).</p>}
     </div>
   )
 }

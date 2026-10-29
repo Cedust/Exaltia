@@ -18,7 +18,7 @@ export function TournamentScreen({ regionId, onBack, onPrepare }: { regionId: st
     <div className="relative min-h-full pb-10">
       <Ambience backdrop={regionId} dim={0.45} />
       <ScreenHeader title={region.tournament.name} subtitle={`${region.name} Tournament`} onBack={onBack} />
-      <div className="mx-auto max-w-xl px-4 pt-4">
+      <div className="mx-auto max-w-xl px-3 pt-4">
         <div className="flex justify-center">
           <ElementLabel element={region.element} />
         </div>
@@ -50,8 +50,8 @@ export function TournamentScreen({ regionId, onBack, onPrepare }: { regionId: st
                     {done ? '✓' : final ? '♛' : i + 1}
                   </div>
                   <div className="min-w-0 flex-1">
-                    <div className="label-caps !text-[0.6rem]">{match.name}</div>
-                    <div className="truncate font-display text-base tracking-wide text-ivory">{match.opponent}</div>
+                    <div className="label-caps !text-2xs">{match.name}</div>
+                    <div className="font-display text-base leading-tight tracking-wide text-ivory">{match.opponent}</div>
                     <div className="text-xs text-mist">
                       {rules.teamSize}v{rules.teamSize} · Bo{bestOfFor(match)}
                       {final ? ' · Boss battle' : ''}

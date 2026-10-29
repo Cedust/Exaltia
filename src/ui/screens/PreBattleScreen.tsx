@@ -27,7 +27,7 @@ const STAT_LABELS: [keyof Stats, string][] = [
 
 export function StatLine({ stats }: { stats: Stats }) {
   return (
-    <div className="flex flex-wrap gap-x-2.5 gap-y-0.5 text-[0.72rem] text-mist">
+    <div className="flex flex-wrap gap-x-2.5 gap-y-0.5 text-xs text-mist">
       {STAT_LABELS.map(([key, label]) => (
         <span key={key}>
           {label} <span className="font-bold text-ivory">{stats[key]}</span>
@@ -65,7 +65,7 @@ export function PreBattleScreen({ encounter, onBack, onFight }: { encounter: Enc
       {(encounter.modifiers?.length ?? 0) > 0 && (
         <div className="flex flex-wrap justify-center gap-1.5 bg-black/30 px-3 py-1.5">
           {encounter.modifiers!.map((m, i) => (
-            <span key={i} className="rounded-sm border border-gold/40 px-2 py-0.5 text-[0.68rem] uppercase tracking-wider text-gold-bright">
+            <span key={i} className="rounded-sm border border-gold/40 px-2 py-0.5 text-xs uppercase tracking-wider text-gold-bright">
               {describeModifier(m)}
             </span>
           ))}
@@ -93,7 +93,7 @@ export function PreBattleScreen({ encounter, onBack, onFight }: { encounter: Enc
                 Best of {bestOf}: win {Math.ceil(bestOf / 2)} round{bestOf > 1 ? 's' : ''}. Before every round {encounter.opponent} swears a Vow first, then you answer with
                 one of yours.
               </p>
-              <div className="ornate-soft p-2">
+              <div className="ornate-soft bleed px-2 py-3">
                 <FormationGrid player={save.formation} enemy={enemy} opponent={encounter.opponent} preview={preview} />
               </div>
               {enemyWeakness.length > 0 && (
@@ -107,8 +107,8 @@ export function PreBattleScreen({ encounter, onBack, onFight }: { encounter: Enc
                   ))}
                 </p>
               )}
-              <div className="ornate-soft p-3">
-                <div className="label-caps !text-[0.6rem]">Favourite Vows · {theme.theme}</div>
+              <div className="ornate-soft bleed p-4">
+                <div className="label-caps !text-2xs">Favourite Vows · {theme.theme}</div>
                 <div className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-xs">
                   {theme.prefers.map((id) => (
                     <span key={id} className={RARITY_STYLE[VOW_BY_ID[id].rarity].color}>
@@ -139,7 +139,7 @@ export function PreBattleScreen({ encounter, onBack, onFight }: { encounter: Enc
                 Choose {rules.teamSize} creature{rules.teamSize > 1 ? 's' : ''}. The team is locked for the whole match, but you may re-form it before every
                 round. A Front creature protects the Back creature in its own Lane, and attacks go to their own Lane first.
               </p>
-              <div className="ornate-soft p-2">
+              <div className="ornate-soft bleed px-2 py-3">
                 <FormationGrid player={save.formation} enemy={enemy} opponent={encounter.opponent} preview={preview} onChange={setFormation} />
               </div>
               <div>
@@ -158,15 +158,15 @@ export function PreBattleScreen({ encounter, onBack, onFight }: { encounter: Enc
                         className={`relative flex flex-col items-center rounded-md border p-1 transition ${placed ? 'border-gold bg-gold/15' : 'border-gold/15 bg-black/25'} ${ok ? '' : 'opacity-30'}`}
                       >
                         <CreatureArt creature={c} className="h-14 w-full" />
-                        <span className={`w-full truncate text-center text-[0.65rem] font-bold ${ELEMENT_TEXT[c.element]}`}>{c.name}</span>
+                        <span className={`line-clamp-2 w-full text-center text-xs font-bold leading-tight ${ELEMENT_TEXT[c.element]}`}>{c.name}</span>
                         {placed && <span className="absolute right-1 top-1 h-2 w-2 rounded-full bg-gold shadow-[0_0_6px_#e6c47a]" />}
-                        {c.kind === 'paragon' && <span className="absolute left-1 top-0.5 text-[0.6rem] text-gold">✦</span>}
+                        {c.kind === 'paragon' && <span className="absolute left-1 top-0.5 text-2xs text-gold">✦</span>}
                       </button>
                     )
                   })}
                 </div>
               </div>
-              <p className="text-center text-[0.7rem] text-mist">Your Vows: {save.vows.length}. Challenges teach new ones.</p>
+              <p className="text-center text-xs text-mist">Your Vows: {save.vows.length}. Challenges teach new ones.</p>
             </div>
           )}
         </div>
@@ -193,30 +193,30 @@ function EnemyCard({ member }: { member: MatchMember }) {
   const stats = member.loadout.stats ?? creature.stats
   const skills = member.loadout.skills ?? creature.skills
   return (
-    <div className={`ornate-soft p-3 ${member.boss ? '!border-gold/60' : ''}`}>
+    <div className={`ornate-soft bleed p-4 ${member.boss ? '!border-gold/60' : ''}`}>
       <div className="flex gap-3">
         <CreatureArt creature={creature} flip className="h-20 w-20 shrink-0" />
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-baseline gap-x-2">
             <span className="font-display text-base text-gold-bright">{creature.name}</span>
-            {member.boss && <span className="rounded-sm bg-red-500/25 px-1.5 text-[0.6rem] uppercase tracking-widest text-red-200">Boss</span>}
-            <span className="label-caps !text-[0.55rem]">
+            {member.boss && <span className="rounded-sm bg-red-500/25 px-1.5 text-2xs uppercase tracking-widest text-red-200">Boss</span>}
+            <span className="label-caps !text-2xs">
               {LANE_NAMES[member.lane]} {member.row}
             </span>
           </div>
           <div className="flex items-center gap-2">
             <ElementLabel element={creature.element} />
-            <span className="text-[0.7rem] text-mist">{creature.role}</span>
+            <span className="text-xs text-mist">{creature.role}</span>
           </div>
           <div className="mt-1">
             <StatLine stats={stats} />
           </div>
         </div>
       </div>
-      <div className="mt-2 space-y-1 text-[0.75rem]">
-        {member.boss && <p className="text-[0.7rem] italic text-red-200/80">Below 50% Lifeforce its Sigil blazes and it fights fiercer.</p>}
+      <div className="mt-2 space-y-1 text-xs">
+        {member.boss && <p className="text-xs italic text-red-200/80">Below 50% Lifeforce its Sigil blazes and it fights fiercer.</p>}
         <details className="text-mist">
-          <summary className="cursor-pointer text-[0.7rem] text-gold">Skills</summary>
+          <summary className="cursor-pointer text-xs text-gold">Skills</summary>
           <ul className="mt-1 space-y-0.5">
             {skills.map((id) => (
               <li key={id}>
