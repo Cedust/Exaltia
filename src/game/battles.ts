@@ -1,7 +1,7 @@
 import type { Position, StatusId } from '../core/types'
 import { CONTENT } from '../data'
 import { FIRST_TRIAL, REGIONS, REGION_BY_ID, type Encounter, type EnemySpec, type Modifier } from '../data/world'
-import { MAX_PER_ROW, defaultRow, isFrontLiner, newMatch, pickBossVows, type DuelMatch, type MatchMember, type SwornVow } from './duel'
+import { isFrontLiner, newMatch, placeFor, pickBossVows, type DuelMatch, type MatchMember, type SwornVow } from './duel'
 import { enemyLoadout, playerLoadout } from './loadout'
 import { BEST_OF, BOSS, BOSS_VOWS, ENEMY_LIFEFORCE, FINALE_TIER, OPPONENT_THEMES, REMATCH_TIER, teamSizeFor } from './rules'
 import { tournamentsWon, type SaveState } from './save'
@@ -138,7 +138,7 @@ export function enemyMembers(save: SaveState, encounter: Encounter): MatchMember
     })
     if (encounter.kind === 'trial') loadout.stats = { ...loadout.stats!, might: Math.round(loadout.stats!.might * 0.75) }
     if (rules.enemyStatus) loadout.passives = [...(loadout.passives ?? []), { type: 'startStatus', ...rules.enemyStatus }]
-    return { creature: spec.creature, row: spec.position.row, loadout, boss: spec.boss }
+    return { creature: spec.creature, lane: spec.position.lane, row: spec.position.row, loadout, boss: spec.boss }
   })
 }
 
@@ -164,12 +164,8 @@ export function allowedIn(rules: BattleRules, id: string): boolean {
   return !(rules.onlyAcolytes && c.kind === 'paragon') && !rules.banned.includes(c.element)
 }
 
-/** Its preferred row, or the other one when that row is full. */
-export function rowFor(formation: SaveState['formation'], id: string): 'front' | 'back' {
-  const row = defaultRow(id)
-  const other = row === 'front' ? 'back' : 'front'
-  return formation.filter((f) => f.row === row).length >= MAX_PER_ROW ? other : row
-}
+/** Adds a creature to the formation in its preferred row, from the middle out. */
+export const joinFormation = (formation: SaveState['formation'], id: string): SaveState['formation'] => [...formation, { creature: id, ...placeFor(formation, id) }]
 
 /**
  * Fits the saved formation to an encounter before the pre-battle screen opens: drops creatures the rules forbid,
@@ -186,7 +182,7 @@ export function fitFormation(save: SaveState, encounter: Encounter): SaveState['
   const candidates = save.order.filter((id) => allowedIn(rules, id) && !formation.some((f) => f.creature === id)).sort((a, b) => rank(b) - rank(a))
   for (const id of candidates) {
     if (formation.length >= rules.teamSize) break
-    formation = [...formation, { creature: id, row: rowFor(formation, id) }]
+    formation = joinFormation(formation, id)
   }
   return formation
 }
@@ -194,7 +190,7 @@ export function fitFormation(save: SaveState, encounter: Encounter): SaveState['
 /** The player's team for a match: the saved formation with each creature's current strength. */
 export function playerMembers(save: SaveState): MatchMember[] {
   const won = tournamentsWon(save)
-  return save.formation.map((f) => ({ creature: f.creature, row: f.row, loadout: playerLoadout(save.creatures[f.creature], won) }))
+  return save.formation.map((f) => ({ creature: f.creature, lane: f.lane, row: f.row, loadout: playerLoadout(save.creatures[f.creature], won) }))
 }
 
 // ── Matches ──

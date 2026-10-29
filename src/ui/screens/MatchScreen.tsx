@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { runBattle } from '../../core/battle'
-import type { BattleResult, Row } from '../../core/types'
+import type { BattleResult } from '../../core/types'
 import { CONTENT } from '../../data'
 import type { Encounter } from '../../data/world'
 import {
@@ -11,12 +11,12 @@ import {
   matchWinner,
   offerFor,
   offerRules,
+  previewTargets,
   recordRound,
   resolveVow,
   roundNumber,
   roundSeed,
   roundTeams,
-  rowFull,
   swear,
   winsNeeded,
   type DuelMatch,
@@ -24,8 +24,9 @@ import {
   type SwornVow,
 } from '../../game/duel'
 import { KIND_NAMES, VOW_BY_ID } from '../../game/vows'
+import { FormationGrid } from '../FormationGrid'
 import { Ambience, CreatureArt, Divider, ScreenHeader } from '../kit'
-import { ELEMENT_TEXT, RARITY_STYLE } from '../styles'
+import { RARITY_STYLE } from '../styles'
 import { BattleScreen } from './BattleScreen'
 
 type Phase = { kind: 'pick'; match: DuelMatch } | { kind: 'battle'; match: DuelMatch; result: BattleResult; id: number }
@@ -88,67 +89,6 @@ export function MatchScreen({
 
 // ── Shared pieces (also used when scouting and after the match) ──
 
-/** Front / Back toggle per creature (max 3 per row). */
-export function RowEditor<T extends DuelSlot>({ slots, onChange }: { slots: T[]; onChange: (slots: T[]) => void }) {
-  return (
-    <div className="space-y-1.5">
-      {slots.map((s, i) => {
-        const creature = CONTENT.creatures[s.creature]
-        return (
-          <div key={s.creature} className="flex items-center justify-between gap-2 rounded border border-gold/15 bg-night/50 px-2 py-1">
-            <span className="flex min-w-0 items-center gap-2">
-              <CreatureArt creature={creature} className="h-9 w-9 shrink-0" halo={false} />
-              <span className={`truncate text-sm font-bold ${ELEMENT_TEXT[creature.element]}`}>{creature.name}</span>
-            </span>
-            <div className="flex shrink-0 overflow-hidden rounded-full border border-gold/40">
-              {(['front', 'back'] as const).map((row: Row) => (
-                <button
-                  key={row}
-                  type="button"
-                  disabled={s.row !== row && rowFull(slots, row, i)}
-                  onClick={() => onChange(slots.map((x, j) => (j === i ? { ...x, row } : x)))}
-                  className={`px-3 py-1 font-display text-[0.65rem] tracking-wider disabled:opacity-30 ${s.row === row ? 'bg-gold/25 text-gold-bright' : 'text-mist'}`}
-                >
-                  {row === 'front' ? 'Front' : 'Back'}
-                </button>
-              ))}
-            </div>
-          </div>
-        )
-      })}
-    </div>
-  )
-}
-
-/** Both rows of a team as small portraits: the Front Row shields the Back Row. */
-export function TeamRows({ slots, enemy }: { slots: DuelSlot[]; enemy?: boolean }) {
-  const rows: Row[] = ['front', 'back']
-  return (
-    <div className="space-y-1.5">
-      {rows.map((row) => {
-        const members = slots.filter((s) => s.row === row)
-        return (
-          <div key={row} className="flex items-center gap-2">
-            <span className="label-caps w-12 shrink-0 !text-[0.55rem]">{row} row</span>
-            <div className="flex min-h-14 flex-1 flex-wrap gap-1.5">
-              {members.length === 0 && <span className="self-center text-xs text-mist/60">empty</span>}
-              {members.map((s, i) => {
-                const creature = CONTENT.creatures[s.creature]
-                return (
-                  <div key={i} className="flex w-16 flex-col items-center">
-                    <CreatureArt creature={creature} className="h-14 w-14" halo={false} flip={enemy} />
-                    <span className={`w-full truncate text-center text-[0.6rem] font-bold ${ELEMENT_TEXT[creature.element]}`}>{creature.name}</span>
-                  </div>
-                )
-              })}
-            </div>
-          </div>
-        )
-      })}
-    </div>
-  )
-}
-
 export function Score({ match }: { match: DuelMatch }) {
   const need = winsNeeded(match)
   const pips = (wins: number, color: string) => (
@@ -185,8 +125,8 @@ export function VowCard({ id, selected, onClick, carrier }: { id: string; select
         <span className={`label-caps !text-[0.55rem] ${style.color}`}>{style.label}</span>
       </div>
       <div className="label-caps !text-[0.55rem]">
-        {KIND_NAMES[vow.kind]} · {vow.scope === 'creature' ? 'one creature' : vow.scope === 'team' ? 'whole team' : 'Front Row'}
-        {carrier && <span className="text-ivory"> · {carrier}</span>}
+        {KIND_NAMES[vow.kind]} · {vow.carrier ?? (vow.scope === 'creature' ? 'one creature' : vow.scope === 'team' ? 'whole team' : 'Front Row')}
+        {carrier && carrier !== vow.carrier && <span className="text-ivory"> · {carrier}</span>}
       </div>
       <p className="mt-1 text-xs leading-snug text-ivory/85">{vow.text}</p>
     </>
@@ -262,6 +202,9 @@ function PickView({ match: initial, onFight, onForfeit }: { match: DuelMatch; on
     setTarget(undefined)
   }
   const fight = (sworn: SwornVow | null) => onFight(sworn ? swear(match, 'player', sworn) : match)
+  // The preview already counts the Vow you are about to swear.
+  const tentative = choice && ready ? swear(match, 'player', resolveVow(match, 'player', choice, target)) : match
+  const preview = previewTargets(tentative.player, tentative.enemy, tentative.vows)
 
   return (
     <div className="relative min-h-full pb-32">
@@ -356,15 +299,15 @@ function PickView({ match: initial, onFight, onForfeit }: { match: DuelMatch; on
           </>
         )}
 
-        {match.player.length > 1 && (
-          <>
-            <Divider>Formation</Divider>
-            <RowEditor slots={match.player} onChange={(player) => setMatch((m) => ({ ...m, player }))} />
-          </>
-        )}
-
-        <Divider>Opponent</Divider>
-        <TeamRows slots={match.enemy} enemy />
+        <Divider>Formation</Divider>
+        {match.reformed && <p className="mb-2 text-center text-xs text-[#ffb0a8]">{match.opponent} lost the last round and re-formed its team.</p>}
+        <FormationGrid
+          player={match.player}
+          enemy={match.enemy}
+          opponent={match.opponent}
+          preview={preview}
+          onChange={(player) => setMatch((m) => ({ ...m, player }))}
+        />
 
         <div className="mt-4 grid grid-cols-2 gap-3 rounded border border-gold/15 bg-night/50 p-3">
           <VowList title="Your Vows" vows={match.vows.player} slots={match.player} />

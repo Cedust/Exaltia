@@ -8,7 +8,7 @@ import { FIRST_TRIAL, REGIONS, neighbours } from './world'
 import { DUELS, bestOfFor, bossVowsFor, duelEncounter, enemyMembers, finaleEncounter, fitFormation, playerMembers, rematchEncounter, startMatch } from '../game/battles'
 import { addCreature, applyMatch, chooseParagon, regionOpen } from '../game/campaign'
 import { autoPlay, buildTeam } from '../game/duel'
-import { BOSS_VOWS, CHALLENGE_VOWS, STARTING_VOWS, TRIAL_VOW } from '../game/rules'
+import { BOSS_VOWS, CHALLENGE_VOWS, STARTING_VOWS, TOURNAMENT_VOWS, TRIAL_VOW } from '../game/rules'
 import { earnedVows, newSave, upgradeSave, type SaveState } from '../game/save'
 import { VOW_BY_ID } from '../game/vows'
 
@@ -100,7 +100,7 @@ describe('encounters', () => {
   })
 
   it('teaches every Vow exactly once over the campaign', () => {
-    const taught = [...STARTING_VOWS, TRIAL_VOW, ...Object.values(CHALLENGE_VOWS)]
+    const taught = [...STARTING_VOWS, TRIAL_VOW, ...TOURNAMENT_VOWS, ...Object.values(CHALLENGE_VOWS)]
     expect(new Set(taught).size).toBe(taught.length)
     expect(taught.sort()).toEqual(Object.keys(VOW_BY_ID).sort())
     const challengeIds = REGIONS.flatMap((r) => r.challengeSite.challenges.map((c) => c.id)).sort()
@@ -110,7 +110,7 @@ describe('encounters', () => {
   it('simulates 1000 battles in well under 10 seconds', () => {
     const save = lateSave()
     const final = REGIONS[0].tournament.matches[2]
-    const ready: SaveState = { ...save, formation: [{ creature: 'solvane', row: 'front' }, { creature: 'lumion', row: 'back' }] }
+    const ready: SaveState = { ...save, formation: [{ creature: 'solvane', lane: 1, row: 'front' }, { creature: 'lumion', lane: 1, row: 'back' }] }
     const enemy = buildTeam(enemyMembers(ready, final), bossVowsFor(ready, final))
     const player = buildTeam(playerMembers(ready), [])
     const started = performance.now()
@@ -129,8 +129,8 @@ describe('campaign', () => {
         save = {
           ...save,
           formation: [
-            { creature: picks[0], row: 'front' },
-            { creature: picks[1], row: 'back' },
+            { creature: picks[0], lane: 1, row: 'front' },
+            { creature: picks[1], lane: 1, row: 'back' },
           ],
         }
         const { match, results } = autoPlay(startMatch(save, FIRST_TRIAL, 7), (setup) => runBattle(setup, CONTENT))
@@ -180,8 +180,26 @@ describe('campaign', () => {
       formation: [{ creature: 'spire-golem', position: { lane: 1, row: 'front' } }],
     } as unknown as SaveState
     const save = upgradeSave(old)
-    expect(save.formation).toEqual([{ creature: 'spire-golem', row: 'front' }])
+    expect(save.formation).toEqual([{ creature: 'spire-golem', lane: 1, row: 'front' }])
     expect(save.vows).toEqual([...STARTING_VOWS, TRIAL_VOW, 'kindling', 'steam-burst'])
     expect('conditions' in save || 'tactics' in save).toBe(false)
+  })
+
+  it('upgrades a row-only formation to cells and adds Vows taught since', () => {
+    const old = {
+      ...newSave('Rows'),
+      vows: ['stoneskin'],
+      tournamentOrder: ['fire'],
+      formation: [
+        { creature: 'spire-golem', row: 'front' },
+        { creature: 'lumion', row: 'front' },
+        { creature: 'solvane', row: 'back' },
+      ],
+    } as unknown as SaveState
+    const save = upgradeSave(old)
+    expect(save.formation.map((f) => [f.lane, f.row])).toEqual([[1, 'front'], [0, 'front'], [1, 'back']])
+    expect(save.vows).toContain('vanguard')
+    expect(save.vows).toContain(TOURNAMENT_VOWS[0])
+    expect(save.vows).not.toContain(TOURNAMENT_VOWS[1])
   })
 })

@@ -11,12 +11,13 @@ import {
   offerFor,
   pickBossVows,
   offerRules,
-  positions,
+  reform,
   recordRound,
   resolveVow,
   roundSeed,
   roundTeams,
   swear,
+  withLanes,
   type MatchMember,
 } from './duel'
 import { enemyLoadout } from './loadout'
@@ -24,7 +25,7 @@ import { OPPONENT_THEMES } from './rules'
 import { VOWS } from './vows'
 
 const team = (tier: number, ...members: [string, Row][]): MatchMember[] =>
-  members.map(([creature, row]) => ({ creature, row, loadout: enemyLoadout(creature, { tier, teamSize: members.length }) }))
+  withLanes(members.map(([creature, row]) => ({ creature, row, loadout: enemyLoadout(creature, { tier, teamSize: members.length }) })))
 
 const TEAM = team(2, ['basaltor', 'front'], ['pyrelle', 'back'], ['nivaris', 'back'])
 const FIRE = team(4, ['cinder-knight', 'front'], ['ember-sage', 'back'], ['ember-sage', 'back'])
@@ -38,11 +39,35 @@ const match = (enemy = FIRE, seed = 3, bestOf = 5) =>
 
 describe('Vow Duels', () => {
   it('places each row from the middle out', () => {
-    expect(positions(TEAM)).toEqual([
+    expect(TEAM.map(({ lane, row }) => ({ lane, row }))).toEqual([
       { lane: 1, row: 'front' },
       { lane: 1, row: 'back' },
       { lane: 0, row: 'back' },
     ])
+  })
+
+  it('applies Position Vows by cell', () => {
+    const guardOf = (t: MatchMember[], i: number) => buildTeam(t, [{ vow: 'vanguard' }]).members[i].loadout!.stats!.guard
+    const plain = (t: MatchMember[], i: number) => buildTeam(t, []).members[i].loadout!.stats!.guard
+    expect(guardOf(TEAM, 0)).toBeGreaterThan(plain(TEAM, 0))
+    expect(guardOf(TEAM, 1)).toBe(plain(TEAM, 1))
+    // Flanker only works outside the Middle Lane.
+    const snipes = (t: MatchMember[]) => Object.values(buildTeam(t, [{ vow: 'flanker', target: 2 }]).members[2].loadout!.skillDefs!).filter((s) => s.effect === 'damage' && s.pattern === 'single').every((s) => s.ignoresProtection)
+    expect(snipes(TEAM)).toBe(true)
+    expect(snipes(TEAM.map((m, i) => (i === 2 ? { ...m, lane: 1 as const, row: 'front' as const } : i === 0 ? { ...m, lane: 0 as const } : m)))).toBe(false)
+    // Open Lane: only the Back creature without a Front ally in its Lane.
+    const dealt = (i: number) => buildTeam(TEAM, [{ vow: 'open-lane' }]).members[i].loadout!.passives!.filter((p) => p.type === 'damageDealt').length
+    expect([dealt(0), dealt(1), dealt(2)]).toEqual([1, 1, 2])
+  })
+
+  it('the CPU re-forms only after a lost round', () => {
+    const start = match(team(4, ['cinder-knight', 'front'], ['ember-sage', 'back']).map((m, i) => (i === 1 ? { ...m, lane: 2 as const } : m)))
+    expect(reform(start)).toBe(start)
+    expect(reform(recordRound(start, 'enemy'))).toEqual(recordRound(start, 'enemy'))
+    const after = reform(recordRound(start, 'player'))
+    // Its Back creature stood alone in the Bottom Lane: it moves behind the Front creature.
+    expect(after.enemy[1]).toMatchObject({ row: 'back', lane: after.enemy[0].lane })
+    expect(after.reformed).toBe(true)
   })
 
   it('every Vow builds a valid team and a battle that ends', () => {

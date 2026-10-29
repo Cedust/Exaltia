@@ -62,7 +62,8 @@ const list: Scene[] = [
       t("And the best part: you don't fight yourself! Your creatures know their craft. You choose who fights and where they stand."),
       h('Every match is fought in rounds. Before each round your opponent swears a Vow, and then you answer with one of your own.'),
       h('A Vow is a promise of power: a tougher hide, a swifter step, a flame that spreads. It holds until the match is over, so choose with care.'),
-      h('And mind the rows. A creature in the Front Row shields the one behind it.'),
+      h('And mind the field. A creature in the Front shields only the one behind it in the same Lane, and every attack strikes its own Lane first.'),
+      h('So place your creatures with intent: whoever stands across from an enemy is the one it will strike.'),
     ],
   },
   {

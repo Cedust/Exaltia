@@ -31,7 +31,7 @@ export function validateTeam(team: Team, content: Content): void {
   }
 }
 
-function createUnits(setup: BattleSetup, content: Content): Unit[] {
+export function createUnits(setup: BattleSetup, content: Content): Unit[] {
   const sides: [Side, Team][] = [
     ['player', setup.player],
     ['enemy', setup.enemy],
@@ -83,7 +83,7 @@ function createUnits(setup: BattleSetup, content: Content): Unit[] {
 
 const roll = (rng: Rng) => 1 - RULES.variance + rng() * 2 * RULES.variance
 
-function damage(skill: SkillDef, source: Unit, target: Unit, rng: Rng, surge: number, extraPercent = 0) {
+function damage(skill: SkillDef, source: Unit, target: Unit, rng: Rng, surge: number, extraPercent = 0, takenPercent = 0) {
   const attack = effectiveStat(source, skill.stat)
   const defense = skill.piercesDefense ? 0 : effectiveStat(target, skill.stat === 'might' ? 'guard' : 'ward')
   const weakness = isWeakTo(target.creature.element, skill.element)
@@ -96,7 +96,7 @@ function damage(skill: SkillDef, source: Unit, target: Unit, rng: Rng, surge: nu
   multiplier *= 1 + bonus / 100
   multiplier *= 1 + (passiveSum(source, 'damageDealt') + source.attackBonus + extraPercent) / 100
   if (hasStatus(target, 'barrier')) multiplier *= STATUS_NUMBERS.barrierDamage
-  multiplier *= Math.max(0.2, 1 + passiveSum(target, 'damageTaken') / 100)
+  multiplier *= Math.max(0.2, 1 + (passiveSum(target, 'damageTaken') + takenPercent) / 100)
   multiplier *= 1 + surge * RULES.surgeDamagePerTurn
   const base = ((skill.power * attack * RULES.defenseScale) / (RULES.defenseScale + defense)) * RULES.damageScale
   const amount = Math.max(1, Math.round(base * multiplier * roll(rng)))
@@ -326,7 +326,12 @@ export function runBattle(setup: BattleSetup, content: Content): BattleResult {
       }
       const steamReady =
         !!steam && ((skill.element === 'fire' && hasStatus(target, 'chill')) || (skill.element === 'ice' && hasStatus(target, 'burn')))
-      const hit = damage(skill, actor, target, rng, surge(), firstHit?.percent ?? 0)
+      // Shieldwall: a Front creature with a living ally behind it in its Lane takes less damage.
+      const wall = vowOf(target, 'shieldwall')
+      const walled =
+        !!wall && target.position.row === 'front' &&
+        aliveOn(target.side).some((u) => u.position.row === 'back' && u.position.lane === target.position.lane)
+      const hit = damage(skill, actor, target, rng, surge(), firstHit?.percent ?? 0, walled ? -wall.percent : 0)
       const taken = loseLifeforce(target, hit.amount)
       events.push({ type: 'damageDealt', source: actor.id, target: target.id, amount: taken, weakness: hit.weakness, lifeforce: target.lifeforce })
       gainAscension(actor, RULES.ascensionPerHit)

@@ -1,5 +1,8 @@
+import { createUnits } from '../core/battle'
 import { createRng, type Rng } from '../core/rng'
-import type { BattleResult, Loadout, Position, Row, Side, SkillDef, StatusId, Team, TeamMember } from '../core/types'
+import { LANE_NAMES } from '../core/rules'
+import { isProtected, selectTargets } from '../core/targeting'
+import type { BattleResult, Lane, Loadout, Row, Side, SkillDef, StatusId, Team, TeamMember } from '../core/types'
 import { CONTENT } from '../data'
 import { autoPlan } from './autoPlan'
 import { ALL_CONDITIONS } from './rules'
@@ -14,13 +17,13 @@ import { RARITY_RANK, RARITY_WEIGHT, VOWS, VOW_BY_ID, type Rarity, type VowConte
 const PLAN_SLOTS = 4
 /** Duels hit harder than the old long battles, so a round lasts about 30-45 seconds. */
 export const DUEL_DAMAGE_BONUS = 80
-export const MAX_PER_ROW = 3
 
 // ── Teams ──
 
-/** A creature as the match locks it: which creature and the row it stands in this round. */
+/** A creature as the match locks it: which creature and the cell (Lane and Row) it stands in this round. */
 export interface DuelSlot {
   creature: string
+  lane: Lane
   row: Row
 }
 
@@ -30,17 +33,54 @@ export interface MatchMember extends DuelSlot {
   boss?: boolean
 }
 
-/** Lanes are filled from the middle out, so a row of up to three always looks tidy. */
-export function positions(slots: DuelSlot[]): Position[] {
-  const order: (0 | 1 | 2)[] = [1, 0, 2]
-  const used: Record<Row, number> = { front: 0, back: 0 }
-  return slots.map((s) => ({ lane: order[used[s.row]++], row: s.row }))
-}
+export const LANES: Lane[] = [0, 1, 2]
+export { LANE_NAMES }
+/** New creatures fill a row from the middle out. */
+const FILL_ORDER: Lane[] = [1, 0, 2]
 
-export const rowFull = (slots: DuelSlot[], row: Row, except = -1) => slots.filter((s, i) => i !== except && s.row === row).length >= MAX_PER_ROW
+export const occupant = <T extends DuelSlot>(slots: T[], lane: Lane, row: Row) => slots.findIndex((s) => s.lane === lane && s.row === row)
 
 export const isFrontLiner = (id: string) => /^Front|Guardian|Striker|Bulwark|Brawler/.test(CONTENT.creatures[id].role)
 export const defaultRow = (id: string): Row => (isFrontLiner(id) ? 'front' : 'back')
+
+/** The cell a creature joins a formation in: its preferred row from the middle out, else the other row. */
+export function placeFor(slots: DuelSlot[], id: string): { lane: Lane; row: Row } {
+  const preferred = defaultRow(id)
+  for (const row of [preferred, preferred === 'front' ? 'back' : 'front'] as Row[]) {
+    const lane = FILL_ORDER.find((l) => occupant(slots, l, row) < 0)
+    if (lane !== undefined) return { lane, row }
+  }
+  return { lane: 1, row: preferred }
+}
+
+/** Moves a creature to a cell; whoever stands there swaps into its old cell. */
+export function moveTo<T extends DuelSlot>(slots: T[], index: number, lane: Lane, row: Row): T[] {
+  const other = occupant(slots, lane, row)
+  const from = slots[index]
+  return slots.map((s, i) => (i === index ? { ...s, lane, row } : i === other ? { ...s, lane: from.lane, row: from.row } : s))
+}
+
+/** Gives every slot without a free Lane of its own (older saves) a free cell in its row, from the middle out. */
+export function withLanes<T extends { row: Row; lane?: Lane }>(slots: T[]): (T & { lane: Lane })[] {
+  const out: (T & { lane: Lane })[] = []
+  const taken = (lane: Lane, row: Row) => out.some((o) => o.lane === lane && o.row === row)
+  for (const s of slots) {
+    if (s.lane !== undefined && !taken(s.lane, s.row)) {
+      out.push(s as T & { lane: Lane })
+      continue
+    }
+    const row: Row = FILL_ORDER.every((l) => taken(l, s.row)) ? (s.row === 'front' ? 'back' : 'front') : s.row
+    out.push({ ...s, lane: FILL_ORDER.find((l) => !taken(l, row)) ?? 1, row })
+  }
+  return out
+}
+
+/** A Back creature is protected while a Front ally stands in its Lane (Phalanx: also the neighbouring Lanes). */
+export function isGuarded(slots: DuelSlot[], index: number, phalanx = false): boolean {
+  const s = slots[index]
+  if (s.row !== 'back') return false
+  return slots.some((f) => f.row === 'front' && (f.lane === s.lane || (phalanx && Math.abs(f.lane - s.lane) === 1)))
+}
 
 /** A sworn Vow: which one and, for creature Vows, which team member (by index) carries it. */
 export interface SwornVow {
@@ -54,6 +94,7 @@ function baseMember(member: MatchMember): VowMember {
   const ids = [...(loadout.skills ?? creature.skills), creature.basicAttack, ...(creature.ascension ? [creature.ascension] : [])]
   return {
     creature,
+    lane: member.lane,
     row: member.row,
     stats: { ...(loadout.stats ?? creature.stats) },
     passives: [...(loadout.passives ?? []), { type: 'damageDealt', percent: DUEL_DAMAGE_BONUS }],
@@ -73,9 +114,8 @@ export function buildTeam(team: MatchMember[], vows: SwornVow[]): Team {
   const members = team.map(baseMember)
   for (const sworn of vows) {
     const vow = VOW_BY_ID[sworn.vow]
-    for (const m of receivers(vow, members, sworn.target)) vow.apply(m)
+    for (const m of receivers(vow, members, sworn.target)) vow.apply(m, members)
   }
-  const places = positions(team)
   return {
     members: members.map((m, i): TeamMember => {
       const usable = Object.keys(m.skillDefs).filter((id) => id !== m.creature.basicAttack && id !== m.creature.ascension)
@@ -83,7 +123,7 @@ export function buildTeam(team: MatchMember[], vows: SwornVow[]): Team {
       const boss = team[i].boss
       const member: TeamMember = {
         creature: m.creature.id,
-        position: places[i],
+        position: { lane: team[i].lane, row: team[i].row },
         tactics: autoPlan(skills, boss ? PLAN_SLOTS - 1 : PLAN_SLOTS, ALL_CONDITIONS),
         loadout: { stats: m.stats, skills: usable, skillDefs: m.skillDefs, passives: m.passives },
       }
@@ -231,6 +271,8 @@ export interface DuelMatch {
   rerollsLeft: number
   /** How often the player rerolled this round (changes the offer seed). */
   rerolls: number
+  /** The opponent changed its formation at the start of this round. */
+  reformed?: boolean
 }
 
 export interface MatchSetup {
@@ -330,8 +372,32 @@ export const swear = (match: DuelMatch, side: Side, sworn: SwornVow): DuelMatch 
   vows: { ...match.vows, [side]: [...match.vows[side], sworn] },
 })
 
-/** The opponent's turn at the start of a round: it picks from its own offer and reveals the Vow. */
-export function enemySwears(match: DuelMatch): DuelMatch {
+/**
+ * The CPU re-forms only after a lost round: its sturdiest Front creature steps into the Lane of the player's
+ * strongest attacker, then unprotected Back creatures move behind a Front ally where a cell is free.
+ */
+export function reform(match: DuelMatch): DuelMatch {
+  if (match.rounds[match.rounds.length - 1] !== 'player') return match
+  let enemy = match.enemy
+  const threat = (m: VowMember) => attackOf(m) - (healer(m) ? 40 : 0)
+  const attacker = match.player.map(baseMember).sort((a, b) => threat(b) - threat(a))[0]
+  const tank = enemy
+    .map((m, i) => ({ i, m: baseMember(m) }))
+    .filter(({ m }) => m.row === 'front')
+    .sort((a, b) => b.m.stats.lifeforce - a.m.stats.lifeforce)[0]
+  if (attacker && tank && tank.m.lane !== attacker.lane) enemy = moveTo(enemy, tank.i, attacker.lane, 'front')
+  enemy.forEach((_, i) => {
+    if (enemy[i].row !== 'back' || isGuarded(enemy, i)) return
+    const cover = enemy.find((f) => f.row === 'front' && occupant(enemy, f.lane, 'back') < 0)
+    if (cover) enemy = moveTo(enemy, i, cover.lane, 'back')
+  })
+  const moved = enemy.some((m, i) => m.lane !== match.enemy[i].lane || m.row !== match.enemy[i].row)
+  return { ...match, enemy, reformed: moved }
+}
+
+/** The opponent's turn at the start of a round: it re-forms if it lost, then picks from its own offer and reveals the Vow. */
+export function enemySwears(start: DuelMatch): DuelMatch {
+  const match = reform({ ...start, reformed: false })
   const offer = offerFor(match, 'enemy')
   if (offer.length === 0) return match
   const pick = chooseVow(offer, match.prefers, match.player)
@@ -359,6 +425,7 @@ export function recordRound(match: DuelMatch, winner: Side | 'draw'): DuelMatch 
 /** Describes who carries a sworn Vow, e.g. "Ember Sage" or "Front Row". */
 export function carrierName(sworn: SwornVow, team: DuelSlot[]): string {
   const vow = VOW_BY_ID[sworn.vow]
+  if (vow.carrier) return vow.carrier
   if (vow.scope === 'team') return 'Team'
   if (vow.scope === 'front') return 'Front Row'
   return sworn.target === undefined ? '' : CONTENT.creatures[team[sworn.target].creature].name
@@ -377,4 +444,40 @@ export function autoPlay(start: DuelMatch, run: (setup: { player: Team; enemy: T
     match = recordRound(match, result.winner)
   }
   return { match, results }
+}
+
+// ── Targeting Preview ──
+
+export interface TargetArrow {
+  side: Side
+  /** Team index of the attacker and of its first target. */
+  from: number
+  to: number
+  /** The arrow of a Snipe skill (reaches the Back Row). */
+  snipe: boolean
+}
+
+export interface TargetPreview {
+  arrows: TargetArrow[]
+  /** Per side and team index: a Back creature without protection. */
+  open: Record<Side, boolean[]>
+}
+
+/** Who each creature would attack first at the start of the round, by the Lane Rule (with every Vow applied). */
+export function previewTargets(player: MatchMember[], enemy: MatchMember[], vows: Record<Side, SwornVow[]>): TargetPreview {
+  const units = createUnits({ player: buildTeam(player, vows.player), enemy: buildTeam(enemy, vows.enemy), seed: 0 }, CONTENT)
+  const indexOf = (id: string) => Number(id.split('-')[1])
+  const arrows: TargetArrow[] = []
+  for (const unit of units) {
+    const basic = unit.skills[unit.creature.basicAttack]
+    const first = selectTargets(basic, 'sameLane', unit, units)[0]
+    if (first) arrows.push({ side: unit.side, from: indexOf(unit.id), to: indexOf(first.id), snipe: !!basic.ignoresProtection })
+    const sniper = Object.values(unit.skills).find((s) => s.effect === 'damage' && s.pattern === 'single' && s.ignoresProtection)
+    if (sniper && !basic.ignoresProtection) {
+      const aimed = selectTargets(sniper, 'sameLane', unit, units)[0]
+      if (aimed && aimed !== first) arrows.push({ side: unit.side, from: indexOf(unit.id), to: indexOf(aimed.id), snipe: true })
+    }
+  }
+  const open = (side: Side) => units.filter((u) => u.side === side).map((u) => u.position.row === 'back' && !isProtected(u, units))
+  return { arrows, open: { player: open('player'), enemy: open('enemy') } }
 }

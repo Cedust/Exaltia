@@ -4,7 +4,7 @@ import { PARAGON_IDS } from '../data/creatures'
 import { FIRST_TRIAL, REGIONS, REGION_BY_ID, neighbours, type Encounter } from '../data/world'
 import { DUELS } from './battles'
 import type { DuelMatch } from './duel'
-import { CHALLENGE_VOWS, SHARD_REWARDS, TRIAL_VOW, XP, awakeningOf, masteryOf } from './rules'
+import { CHALLENGE_VOWS, SHARD_REWARDS, TOURNAMENT_VOWS, TRIAL_VOW, XP, awakeningOf, masteryOf } from './rules'
 import { newOwned, tournamentsWon, type SaveState } from './save'
 
 // ── Availability on the map ──
@@ -154,7 +154,10 @@ export function applyMatch(save: SaveState, encounter: Encounter, match: DuelMat
       const stage = tournamentStage(next, regionId)
       next = { ...next, tournaments: { ...next.tournaments, [regionId]: { stage: stage + 1 } } }
       report.shards = encounter.kind === 'final' ? SHARD_REWARDS.final + SHARD_REWARDS.tournament : SHARD_REWARDS.match
-      if (encounter.kind === 'final') report.chooseParagonIn = regionId
+      if (encounter.kind === 'final') {
+        report.chooseParagonIn = regionId
+        unlockVow(TOURNAMENT_VOWS[tournamentsWon(save)])
+      }
       break
     }
     case 'challenge': {

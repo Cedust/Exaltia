@@ -42,6 +42,8 @@ export const lifeforceRatio = (unit: Unit) => unit.lifeforce / unit.stats.lifefo
 
 export const hasStatus = (unit: Unit, status: StatusId) => unit.statuses.some((s) => s.id === status)
 
+export const hasPassive = (unit: Unit, type: Passive['type']) => unit.passives.some((p) => p.type === type)
+
 const passiveValue = (p: Passive) => ('percent' in p ? p.percent : 'amount' in p ? p.amount : 'turns' in p ? p.turns : 1)
 
 /** Sum of a unit's passives of one type, e.g. all its elementPower percents. */

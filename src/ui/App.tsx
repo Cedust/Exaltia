@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import type { BattleResult } from '../core/types'
 import { SCENES } from '../data/story'
 import { FIRST_TRIAL, type Encounter } from '../data/world'
-import { battleRules, DUELS, findAnyEncounter, fitFormation, rowFor, startMatch } from '../game/battles'
+import { battleRules, DUELS, findAnyEncounter, fitFormation, joinFormation, startMatch } from '../game/battles'
 import { addCreature, applyMatch, chooseParagon, openDuel, spireAction, type BattleReport } from '../game/campaign'
 import type { DuelMatch } from '../game/duel'
 import { deleteSave, loadSave, newSave, tournamentsWon, writeSave, type SaveState } from '../game/save'
@@ -42,7 +42,7 @@ const story = (scene: string): Step => ({ kind: 'story', scene })
 
 /** First formation from the two starters: Front-liners in front, the rest behind them. */
 function starterFormation(picks: string[]): SaveState['formation'] {
-  return picks.reduce<SaveState['formation']>((formation, creature) => [...formation, { creature, row: rowFor(formation, creature) }], [])
+  return picks.reduce<SaveState['formation']>(joinFormation, [])
 }
 
 export default function App() {

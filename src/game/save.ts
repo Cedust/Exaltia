@@ -1,5 +1,6 @@
-import type { Row } from '../core/types'
-import { CHALLENGE_VOWS, STARTING_VOWS, TRIAL_VOW, type Act } from './rules'
+import type { Lane, Row } from '../core/types'
+import { withLanes } from './duel'
+import { CHALLENGE_VOWS, STARTING_VOWS, TOURNAMENT_VOWS, TRIAL_VOW, type Act } from './rules'
 
 export interface OwnedCreature {
   id: string
@@ -43,8 +44,8 @@ export interface SaveState {
   vows: string[]
   /** Story scenes already shown. */
   seen: string[]
-  /** The team for the next match, in order, with the row each creature starts in. */
-  formation: { creature: string; row: Row }[]
+  /** The team for the next match, in order, with the cell (Lane and Row) each creature starts in. */
+  formation: { creature: string; lane: Lane; row: Row }[]
   finale: { won: boolean; ending?: 'oath' | 'unbound' }
   stats: { battles: number; wins: number }
   speed: number
@@ -104,25 +105,32 @@ export function loadSave(): SaveState | null {
   }
 }
 
-/** Vows a journey has earned so far: the starting set, the First Trial and every Challenge won. */
-export function earnedVows(save: Pick<SaveState, 'firstTrialWon' | 'challenges'>): string[] {
+/** Vows a journey has earned so far: the starting set, the First Trial, Tournaments and every Challenge won. */
+export function earnedVows(save: Pick<SaveState, 'firstTrialWon' | 'challenges' | 'tournamentOrder'>): string[] {
   const vows = [...STARTING_VOWS]
   if (save.firstTrialWon) vows.push(TRIAL_VOW)
+  vows.push(...TOURNAMENT_VOWS.slice(0, save.tournamentOrder.length))
   for (const id of save.challenges) if (CHALLENGE_VOWS[id]) vows.push(CHALLENGE_VOWS[id])
   return vows
 }
 
-/** Saves from before Vow Duels: Lanes become rows, Conditions and Tactics give way to Vows. */
+/**
+ * Older saves: Conditions and Tactics give way to Vows, formations get a cell (Lane and Row) each, and Vows
+ * added since the save was written are filled in.
+ */
 export function upgradeSave(loaded: SaveState): SaveState {
   const save = { ...loaded } as SaveState & { conditions?: unknown; tactics?: unknown }
   const legacy = save.conditions !== undefined
   delete save.conditions
   delete save.tactics
-  const formation = save.formation.map((f) => {
-    const old = f as { creature: string; row?: Row; position?: { row: Row } }
-    return { creature: old.creature, row: old.row ?? old.position?.row ?? 'front' }
-  })
-  return { ...save, formation, vows: legacy ? earnedVows(save) : save.vows }
+  const formation = withLanes(
+    save.formation.map((f) => {
+      const old = f as { creature: string; lane?: Lane; row?: Row; position?: { lane: Lane; row: Row } }
+      return { creature: old.creature, lane: old.position?.lane ?? old.lane, row: old.row ?? old.position?.row ?? 'front' }
+    }),
+  )
+  const vows = legacy ? earnedVows(save) : [...save.vows, ...earnedVows(save).filter((v) => !save.vows.includes(v))]
+  return { ...save, formation, vows }
 }
 
 export function writeSave(save: SaveState): boolean {

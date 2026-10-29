@@ -12,7 +12,7 @@ import { CONTENT } from '../src/data'
 import { STARTER_IDS } from '../src/data/creatures'
 import { SKILL_TREES, capstoneId, nodeId } from '../src/data/skillTrees'
 import { FIRST_TRIAL, REGIONS, type Encounter } from '../src/data/world'
-import { allowedIn, battleRules, duelEncounter, finaleEncounter, rowFor, startMatch } from '../src/game/battles'
+import { allowedIn, battleRules, duelEncounter, finaleEncounter, joinFormation, startMatch } from '../src/game/battles'
 import { addCreature, chooseParagon } from '../src/game/campaign'
 import { autoPlay } from '../src/game/duel'
 import { treeState } from '../src/game/loadout'
@@ -61,7 +61,7 @@ function formTeam(save: SaveState, encounter: Encounter): SaveState {
   const firstFront = ranked.find(isFront)
   if (firstFront && rules.teamSize > 1) picks.push(firstFront)
   for (const id of ranked) if (picks.length < rules.teamSize && !picks.includes(id)) picks.push(id)
-  const formation = picks.reduce<SaveState['formation']>((f, creature) => [...f, { creature, row: rowFor(f, creature) }], [])
+  const formation = picks.reduce<SaveState['formation']>(joinFormation, [])
   return { ...save, formation }
 }
 

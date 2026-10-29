@@ -143,11 +143,14 @@ export function JournalView() {
         <ul className="space-y-1.5 text-xs leading-snug text-ivory/85">
           <li>✦ Every battle is a <b>match</b> of short auto rounds: best of 5 in Tournaments, best of 3 or 1 in Challenges and duels.</li>
           <li>✦ Before each round the opponent swears a <b>Vow</b> and shows it. Then you pick one of 3 (4 after a lost round). Vows last until the match ends.</li>
-          <li>✦ Your team is locked for the match, but you may move creatures between the rows before every round.</li>
-          <li>✦ Your creatures act on their own, by their role: healers heal, guardians protect, strikers hit the weakest foe.</li>
+          <li>✦ Your team is locked for the match, but you may move creatures to any cell of the grid before every round. The opponent re-forms only after it loses a round.</li>
+          <li>✦ The field has three <b>Lanes</b> (Top, Middle, Bottom) with a Front and a Back cell on each side.</li>
+          <li>✦ Your creatures act on their own, by their role: healers heal, guardians protect, attackers follow the <b>Lane Rule</b>.</li>
           <li>✦ <b>Swiftness</b> decides the Turn Order. Faster creatures act more often.</li>
           <li>✦ Skills cost <b>Essence</b>, which refills a little every turn.</li>
-          <li>✦ The <b>Front Row</b> shields the Back Row. Pierce skills reach through it, Sweep skills hit a whole Row.</li>
+          <li>✦ A Front creature protects the Back creature <b>in its own Lane</b>. A Back creature with no Front ally in its Lane stands open.</li>
+          <li>✦ <b>Lane Rule</b>: attacks go to their own Lane first, else the nearest one, Front before Back. Taunt overrides it.</li>
+          <li>✦ <b>Reach</b>: Single hits one target, Snipe reaches the Back Row and aims there first, Pierce hits a whole Lane, Sweep a whole Row.</li>
           <li>✦ Paragons fill a golden <b>Ascension</b> gauge and unleash their strongest skill on their own.</li>
           <li>✦ After 50 turns the <b>Sigils Surge</b>: damage rises and healing fades, so every battle ends.</li>
           <li>✦ Bosses blaze their Sigil at half Lifeforce and fight fiercer. Tournament champions start the match with a <b>Boss Vow</b>.</li>

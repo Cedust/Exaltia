@@ -1,4 +1,5 @@
 import Phaser from 'phaser'
+import { LANE_NAMES } from '../core/rules'
 import { STATUS_RULES, statusName } from '../core/statuses'
 import type { BattleEvent, BattleResult, Element, Side, StatusId, UnitSnapshot } from '../core/types'
 
@@ -49,20 +50,20 @@ export function canvasSize(orientation: Orientation, aspect: number) {
   return { width: Math.round(Phaser.Math.Clamp(720 * aspect, 1180, 1700)), height: 720 }
 }
 
-/** Positions for a canvas size. Portrait: enemies on top, Lanes as columns. Landscape: player left, enemies right. */
+/** Positions for a canvas size. Always player left, enemies right, Lanes Top / Middle / Bottom as rows. */
 export function makeLayout(width: number, height: number): Layout {
   if (height > width) {
-    const dy = (height - 1280) / 2
+    const mid = height / 2 + 50
     return {
       width,
       height,
       portrait: true,
-      sprite: 168,
+      sprite: 150,
       turnY: 56,
       bossY: 138,
       pos: (side, lane, row) => ({
-        x: 130 + lane * 230,
-        y: dy + (side === 'enemy' ? (row === 'back' ? 310 : 560) : row === 'front' ? 850 : 1100),
+        x: side === 'player' ? (row === 'front' ? 268 : 94) : row === 'front' ? 452 : 626,
+        y: mid + (lane - 1) * Math.min(300, (height - 420) / 3),
       }),
     }
   }
@@ -349,15 +350,24 @@ export class BattleScene extends Phaser.Scene {
     veil.fillRect(0, 0, width, height * 0.22)
     veil.fillGradientStyle(0x0a0918, 0x0a0918, 0x0a0918, 0x0a0918, 0, 0, 0.8, 0.8)
     veil.fillRect(0, height * 0.82, width, height * 0.18)
-    const band = this.add.image(width / 2, portrait ? 680 : 450, 'glow').setTint(0xffe7ad).setAlpha(0.18)
-    band.setScale(portrait ? width / 80 : 2.2, portrait ? 1.1 : height / 90).setBlendMode(Phaser.BlendModes.ADD)
-    // Faint lane runes.
+    const band = this.add.image(width / 2, this.layout.pos('player', 1, 'front').y, 'glow').setTint(0xffe7ad).setAlpha(0.18)
+    band.setScale(portrait ? 1.6 : 2.2, height / 90).setBlendMode(Phaser.BlendModes.ADD)
+    // Lane lines between the Lanes and faint Lane names in the middle.
     const g = this.add.graphics()
-    g.lineStyle(1, 0xe6c47a, 0.12)
+    g.lineStyle(1, 0xe6c47a, 0.16)
+    const left = this.layout.pos('player', 0, 'back').x - this.layout.sprite / 2
+    const right = this.layout.pos('enemy', 0, 'back').x + this.layout.sprite / 2
     for (let lane = 0; lane < 3; lane++) {
-      const a = this.layout.pos('player', lane, 'back')
-      const b = this.layout.pos('enemy', lane, 'back')
-      g.lineBetween(a.x, a.y + this.layout.sprite * 0.42, b.x, b.y + this.layout.sprite * 0.42)
+      const y = this.layout.pos('player', lane, 'back').y
+      if (lane > 0) {
+        const between = (y + this.layout.pos('player', lane - 1, 'back').y) / 2
+        g.lineBetween(left, between, right, between)
+      }
+      this.add
+        .text(width / 2, y, LANE_NAMES[lane].toUpperCase(), style({ fontFamily: DISPLAY, fontSize: '13px', color: '#e6c47a' }))
+        .setOrigin(0.5)
+        .setAlpha(0.35)
+        .setAngle(-90)
     }
     // Rising motes of light.
     for (let i = 0; i < 18; i++) {
@@ -374,6 +384,13 @@ export class BattleScene extends Phaser.Scene {
         onRepeat: () => mote.setPosition(Phaser.Math.Between(0, width), height + 10).setAlpha(0.6),
       })
     }
+  }
+
+  /** A short glow along the Lane an attack goes to. */
+  private laneFlash(y: number, color: number) {
+    const { width, sprite } = this.layout
+    const band = this.add.rectangle(width / 2, y, width, sprite * 1.05, color, 0.14).setDepth(1).setBlendMode(Phaser.BlendModes.ADD)
+    this.tweens.add({ targets: band, alpha: 0, duration: 520 / this.playback.speed, onComplete: () => band.destroy() })
   }
 
   private drawBossBars(bosses: UnitSnapshot[]) {
@@ -453,6 +470,7 @@ export class BattleScene extends Phaser.Scene {
         const enemyTargets = targets.filter((t) => t.unit.side !== view.unit.side)
         if (enemyTargets.length > 0) {
           const target = enemyTargets[0]
+          for (const y of new Set(enemyTargets.map((t) => t.home.y))) this.laneFlash(y, SIDE_COLOR[view.unit.side])
           const dx = (target.home.x - view.home.x) * 0.12
           const dy = (target.home.y - view.home.y) * 0.12
           this.tweens.add({ targets: view.container, x: view.home.x + dx, y: view.home.y + dy, duration: 140 / speed, yoyo: true, ease: 'Quad.easeOut' })

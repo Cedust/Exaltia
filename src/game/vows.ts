@@ -1,4 +1,4 @@
-import type { CreatureDef, Passive, SkillDef, Stats, StatusId } from '../core/types'
+import type { CreatureDef, Lane, Passive, SkillDef, Stats, StatusId } from '../core/types'
 
 /**
  * Vows: the upgrades both sides swear between the rounds of a Vow Duel (design doc "Exaltia – Vow Duels Design").
@@ -14,6 +14,7 @@ export type VowAim = 'attacker' | 'tank' | 'support' | 'paragon'
 /** A team member while its Vows are applied; the result becomes the member's Loadout. */
 export interface VowMember {
   creature: CreatureDef
+  lane: Lane
   row: 'front' | 'back'
   stats: Stats
   passives: Passive[]
@@ -35,7 +36,10 @@ export interface VowDef {
   rarity: Rarity
   scope: VowScope
   text: string
-  apply: (member: VowMember) => void
+  /** Applied to each receiver; `team` is the whole side, for Vows that depend on the formation. */
+  apply: (member: VowMember, team: VowMember[]) => void
+  /** Who it works on, when that is not simply the scope (e.g. "Front Middle"). */
+  carrier?: string
   /** Creature Vows only: who may carry it. */
   canTarget?: (member: VowMember) => boolean
   /** The Vow only shows up in offers when this holds (Covenants). */
@@ -136,7 +140,40 @@ export const VOWS: VowDef[] = [
     apply: (m) => m.passives.push({ type: 'shatterBarrier', label: 'Shatter Ward' }),
   },
 
+  {
+    id: 'vanguard', name: 'Vanguard', kind: 'empower', rarity: 'common', scope: 'team', carrier: 'Front Middle',
+    text: 'The creature in the Front Middle cell: +25% Guard and Ward.',
+    apply: (m) => {
+      if (m.row === 'front' && m.lane === 1) scale(m.stats, ['guard', 'ward'], 1.25)
+    },
+  },
+  {
+    id: 'shieldwall', name: 'Shieldwall', kind: 'counter', rarity: 'common', scope: 'team',
+    text: 'Team: a Front creature with an ally behind it in its Lane takes −20% damage.',
+    apply: (m) => m.passives.push({ type: 'shieldwall', percent: 20, label: 'Shieldwall' }),
+  },
+
   // ── Rare ──
+  {
+    id: 'flanker', name: 'Flanker', kind: 'transform', rarity: 'rare', scope: 'creature', aim: 'attacker',
+    text: 'While it stands in the Top or Bottom Lane, its single-target attacks become Snipes (reach the Back Row, aim there first).',
+    apply: (m) => {
+      if (m.lane !== 1) patchDamage(m, (s) => (s.pattern === 'single' && !s.ignoresProtection ? { ...s, ignoresProtection: true } : null))
+    },
+  },
+  {
+    id: 'lane-lock', name: 'Lane Lock', kind: 'rule', rarity: 'rare', scope: 'creature', aim: 'tank',
+    text: 'Enemies in its Lane must attack it whenever they can reach it.',
+    apply: (m) => m.passives.push({ type: 'laneLock', label: 'Lane Lock' }),
+  },
+  {
+    id: 'open-lane', name: 'Open Lane', kind: 'bargain', rarity: 'rare', scope: 'team', carrier: 'Back Row',
+    text: 'Back creatures without a Front ally in their Lane deal +30% damage (they stand unprotected).',
+    apply: (m, team) => {
+      const open = !team.some((t) => t.row === 'front' && t.lane === m.lane)
+      if (m.row === 'back' && open) m.passives.push({ type: 'damageDealt', percent: 30 })
+    },
+  },
   {
     id: 'split-the-flame', name: 'Split the Flame', kind: 'transform', rarity: 'rare', scope: 'creature', aim: 'attacker',
     text: 'Single-target hits also strike the weakest other enemy for 50%.',
@@ -212,6 +249,13 @@ export const VOWS: VowDef[] = [
     id: 'undying-oath', name: 'Undying Oath', kind: 'rule', rarity: 'exalted', scope: 'team',
     text: 'Once per round, the first of your creatures to fall returns with 40% Lifeforce.',
     apply: (m) => m.passives.push({ type: 'undying', percent: 40, label: 'Undying Oath' }),
+  },
+  {
+    id: 'phalanx', name: 'Phalanx', kind: 'rule', rarity: 'exalted', scope: 'team',
+    text: 'Team: your Front Row also protects the Back Row of the neighbouring Lanes.',
+    apply: (m) => {
+      if (m.row === 'front') m.passives.push({ type: 'phalanx', label: 'Phalanx' })
+    },
   },
   {
     id: 'ember-covenant', name: 'Ember Covenant', kind: 'covenant', rarity: 'exalted', scope: 'team',

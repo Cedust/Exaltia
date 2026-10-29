@@ -1,3 +1,4 @@
+import { LANE_NAMES } from './rules'
 import { statusName } from './statuses'
 import type { BattleEvent, Condition, Element, TargetPriority, UnitSnapshot } from './types'
 
@@ -48,7 +49,7 @@ const TARGET_NAMES: Record<TargetPriority, string> = {
   highestResonance: 'Highest Resonance',
   highestSwiftness: 'Highest Swiftness',
   weakToSkill: 'Weak to Skill Element',
-  sameLane: 'Same Lane',
+  sameLane: 'Lane Rule',
   self: 'Self',
 }
 
@@ -75,7 +76,7 @@ export function formatBattleLog(events: BattleEvent[]): BattleLogLine[] {
         for (const side of ['player', 'enemy'] as const) {
           const team = event.units
             .filter((u) => u.side === side)
-            .map((u) => `${u.name} (${u.position.row === 'front' ? 'Front' : 'Back'} Row)`)
+            .map((u) => `${u.name} (${LANE_NAMES[u.position.lane]} ${u.position.row === 'front' ? 'Front' : 'Back'})`)
           push(`${side === 'player' ? 'Player' : 'Enemy'}: ${team.join(', ')}`)
         }
         break

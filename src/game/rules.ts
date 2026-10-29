@@ -157,8 +157,12 @@ export const STARTING_VOWS = [
   'blood-price',
   'opening-gambit',
   'undying-oath',
+  'vanguard',
+  'shieldwall',
 ]
 export const TRIAL_VOW = 'dawnbreak'
+/** Position Vows taught by the first, second, third and fourth Tournament won (any region). */
+export const TOURNAMENT_VOWS = ['flanker', 'lane-lock', 'open-lane', 'phalanx']
 /** Each region's Challenges teach a Vow that fits the region (first win only). */
 export const CHALLENGE_VOWS: Record<string, string> = {
   'radiance-c1': 'shatter-ward',

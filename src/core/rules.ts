@@ -50,3 +50,6 @@ export function isWeakTo(defender: Element, attack: Element): boolean {
 }
 
 export const opposite = (element: Element) => OPPOSITES[element]
+
+/** Lanes run top to bottom on every screen. */
+export const LANE_NAMES = ['Top', 'Middle', 'Bottom'] as const

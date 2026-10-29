@@ -3,15 +3,16 @@ import { opposite } from '../../core/rules'
 import type { Stats } from '../../core/types'
 import { CONTENT } from '../../data'
 import type { Encounter } from '../../data/world'
-import { allowedIn, battleRules, bestOfFor, bossVowsFor, describeModifier, enemyMembers, formationProblems, rowFor, themeOf } from '../../game/battles'
-import { carrierName, type MatchMember } from '../../game/duel'
+import { allowedIn, battleRules, bestOfFor, bossVowsFor, describeModifier, enemyMembers, formationProblems, joinFormation, playerMembers, themeOf } from '../../game/battles'
+import { LANE_NAMES, carrierName, previewTargets, type MatchMember } from '../../game/duel'
 import type { SaveState } from '../../game/save'
 import { VOW_BY_ID } from '../../game/vows'
 import { describeSkill } from '../describeSkill'
 import { useGame } from '../GameContext'
 import { Ambience, CreatureArt, Divider, ElementGem, ElementLabel, ScreenHeader } from '../kit'
 import { ELEMENT_TEXT, RARITY_STYLE } from '../styles'
-import { RowEditor, TeamRows, VowCard } from './MatchScreen'
+import { FormationGrid } from '../FormationGrid'
+import { VowCard } from './MatchScreen'
 
 type Tab = 'scout' | 'team'
 
@@ -45,13 +46,14 @@ export function PreBattleScreen({ encounter, onBack, onFight }: { encounter: Enc
   const bossVows = bossVowsFor(save, encounter)
   const bestOf = bestOfFor(encounter)
   const [tab, setTab] = useState<Tab>(problems.length === 0 ? 'scout' : 'team')
+  const preview = previewTargets(playerMembers(save), enemy, { player: [], enemy: bossVows })
 
   const setFormation = (formation: SaveState['formation']) => update((s) => ({ ...s, formation }))
   const toggle = (id: string) => {
     const formation = save.formation
     if (formation.some((f) => f.creature === id)) return setFormation(formation.filter((f) => f.creature !== id))
     if (formation.length >= rules.teamSize || !allowedIn(rules, id)) return
-    setFormation([...formation, { creature: id, row: rowFor(formation, id) }])
+    setFormation(joinFormation(formation, id))
   }
 
   const enemyWeakness = [...new Set(enemy.map((m) => opposite(CONTENT.creatures[m.creature].element)).filter(Boolean))]
@@ -91,8 +93,8 @@ export function PreBattleScreen({ encounter, onBack, onFight }: { encounter: Enc
                 Best of {bestOf}: win {Math.ceil(bestOf / 2)} round{bestOf > 1 ? 's' : ''}. Before every round {encounter.opponent} swears a Vow first, then you answer with
                 one of yours.
               </p>
-              <div className="ornate-soft p-3">
-                <TeamRows slots={enemy} enemy />
+              <div className="ornate-soft p-2">
+                <FormationGrid player={save.formation} enemy={enemy} opponent={encounter.opponent} preview={preview} />
               </div>
               {enemyWeakness.length > 0 && (
                 <p className="text-center text-xs text-mist">
@@ -134,10 +136,12 @@ export function PreBattleScreen({ encounter, onBack, onFight }: { encounter: Enc
           {tab === 'team' && (
             <div className="space-y-4 fade-in">
               <p className="text-center text-xs text-mist">
-                Choose {rules.teamSize} creature{rules.teamSize > 1 ? 's' : ''}. The team is locked for the whole match, but you may move creatures between the rows
-                before every round. The Front Row shields the Back Row.
+                Choose {rules.teamSize} creature{rules.teamSize > 1 ? 's' : ''}. The team is locked for the whole match, but you may re-form it before every
+                round. A Front creature protects the Back creature in its own Lane, and attacks go to their own Lane first.
               </p>
-              {save.formation.length > 0 && <RowEditor slots={save.formation} onChange={setFormation} />}
+              <div className="ornate-soft p-2">
+                <FormationGrid player={save.formation} enemy={enemy} opponent={encounter.opponent} preview={preview} onChange={setFormation} />
+              </div>
               <div>
                 <div className="label-caps mb-2">Your creatures</div>
                 <div className="grid grid-cols-4 gap-2 sm:grid-cols-5">
@@ -196,7 +200,9 @@ function EnemyCard({ member }: { member: MatchMember }) {
           <div className="flex flex-wrap items-baseline gap-x-2">
             <span className="font-display text-base text-gold-bright">{creature.name}</span>
             {member.boss && <span className="rounded-sm bg-red-500/25 px-1.5 text-[0.6rem] uppercase tracking-widest text-red-200">Boss</span>}
-            <span className="label-caps !text-[0.55rem]">{member.row} row</span>
+            <span className="label-caps !text-[0.55rem]">
+              {LANE_NAMES[member.lane]} {member.row}
+            </span>
           </div>
           <div className="flex items-center gap-2">
             <ElementLabel element={creature.element} />

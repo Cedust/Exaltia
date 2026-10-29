@@ -38,11 +38,11 @@ export interface Action {
   targets: Unit[]
 }
 
-/** The Ascension skill fires on its own once the gauge is full; it picks the weakest reachable target. */
+/** The Ascension skill fires on its own once the gauge is full: attacks follow the Lane Rule, support aims at the weakest ally. */
 export function chooseAscension(actor: Unit, units: Unit[]): Action | null {
   const skill = actor.ascensionSkill
   if (!skill || actor.ascension < RULES.ascensionMax) return null
-  const targets = selectTargets(skill, 'lowestLifeforce', actor, units)
+  const targets = selectTargets(skill, skill.effect === 'damage' ? 'sameLane' : 'lowestLifeforce', actor, units)
   return targets.length > 0 ? { skill, tactic: null, ascension: true, targets } : null
 }
 
