@@ -40,10 +40,11 @@ export function autoPlan(skills: SkillDef[], slots: number, allowed: readonly Co
       add(priority, condition, skill, skill.selfOnly ? 'self' : status === 'haste' ? 'highestMight' : 'lowestLifeforce')
     } else {
       const status = skill.inflicts && skill.inflicts.chance >= 0.5 && !isBuff(skill.inflicts.status) ? skill.inflicts.status : null
-      if (status && can('enemyWithoutStatus')) add(70, { type: 'enemyWithoutStatus', status }, skill, 'highestLifeforce')
-      if (skill.pattern !== 'single' && can('enemiesAtLeast')) add(50 + damageValue(skill) * 5, { type: 'enemiesAtLeast', count: 2 }, skill, 'lowestLifeforce')
-      if (skill.bonusVsStatus && can('enemyHasStatus')) add(45 + damageValue(skill) * 5, { type: 'enemyHasStatus', status: skill.bonusVsStatus.status }, skill, 'lowestLifeforce')
-      add(30 + damageValue(skill) * 10, { type: 'always' }, skill, skill.element === 'physical' ? 'lowestLifeforce' : 'weakToSkill')
+      // Attacks follow the Lane Rule, so the formation decides who gets hit.
+      if (status && can('enemyWithoutStatus')) add(70, { type: 'enemyWithoutStatus', status }, skill, 'sameLane')
+      if (skill.pattern !== 'single' && can('enemiesAtLeast')) add(50 + damageValue(skill) * 5, { type: 'enemiesAtLeast', count: 2 }, skill, 'sameLane')
+      if (skill.bonusVsStatus && can('enemyHasStatus')) add(45 + damageValue(skill) * 5, { type: 'enemyHasStatus', status: skill.bonusVsStatus.status }, skill, 'sameLane')
+      add(30 + damageValue(skill) * 10, { type: 'always' }, skill, 'sameLane')
     }
   }
 
@@ -62,7 +63,7 @@ export function autoPlan(skills: SkillDef[], slots: number, allowed: readonly Co
   if (!hasAttack) {
     const best = skills.filter((s) => s.effect === 'damage' && s.cost > 0).sort((a, b) => damageValue(b) - damageValue(a))[0]
     if (best) {
-      const attack: Tactic = { condition: { type: 'always' }, skill: best.id, target: best.element === 'physical' ? 'lowestLifeforce' : 'weakToSkill' }
+      const attack: Tactic = { condition: { type: 'always' }, skill: best.id, target: 'sameLane' }
       if (plan.length < slots) plan.push(attack)
     }
   }

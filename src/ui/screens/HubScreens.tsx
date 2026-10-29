@@ -7,8 +7,9 @@ import { OATH_MEMORIES } from '../../data/story'
 import { ACT_NAMES } from '../../game/rules'
 import { actOf, tournamentsWon } from '../../game/save'
 import { useGame } from '../GameContext'
+import { VOWS } from '../../game/vows'
 import { ElementGem, ShardIcon, Sigil } from '../kit'
-import { ELEMENT_HEX, characterUrl } from '../styles'
+import { ELEMENT_HEX, RARITY_STYLE, characterUrl } from '../styles'
 
 export type HubTab = 'map' | 'collection' | 'journal' | 'menu'
 
@@ -94,6 +95,24 @@ export function JournalView() {
         )}
       </Section>
 
+      <Section title={`Vows · ${save.vows.length} / ${VOWS.length}`}>
+        <p className="text-xs text-mist">Vows you know can appear in your offers between rounds. The First Trial and every Challenge teach new ones.</p>
+        <div className="mt-2 space-y-1.5">
+          {VOWS.map((v) =>
+            save.vows.includes(v.id) ? (
+              <div key={v.id} className="text-xs">
+                <span className={`font-bold ${RARITY_STYLE[v.rarity].color}`}>{v.name}</span>
+                <span className="text-mist"> · {v.text}</span>
+              </div>
+            ) : (
+              <div key={v.id} className="text-xs text-mist/50">
+                ??? · {RARITY_STYLE[v.rarity].label}
+              </div>
+            ),
+          )}
+        </div>
+      </Section>
+
       <Section title="Elements">
         <p className="text-xs text-mist">Every element has an opposite. A skill against a creature of its opposite element is Weak: +50% damage. Physical has no opposite.</p>
         <div className="mt-2 grid grid-cols-2 gap-2">
@@ -122,14 +141,19 @@ export function JournalView() {
 
       <Section title="How battles work">
         <ul className="space-y-1.5 text-xs leading-snug text-ivory/85">
-          <li>✦ You never act during a battle. You prepare a <b>Battle Plan</b> and watch it play out.</li>
-          <li>✦ Each creature checks its <b>Tactics</b> from top to bottom and uses the first that fits. If none fits, it uses its Basic Attack.</li>
+          <li>✦ Every battle is a <b>match</b> of short auto rounds: best of 5 in Tournaments, best of 3 or 1 in Challenges and duels.</li>
+          <li>✦ Before each round the opponent swears a <b>Vow</b> and shows it. Then you pick one of 3 (4 after a lost round). Vows last until the match ends.</li>
+          <li>✦ Your team is locked for the match, but you may move creatures to any cell of the grid before every round. The opponent re-forms only after it loses a round.</li>
+          <li>✦ The field has three <b>Lanes</b> (Top, Middle, Bottom) with a Front and a Back cell on each side.</li>
+          <li>✦ Your creatures act on their own, by their role: healers heal, guardians protect, attackers follow the <b>Lane Rule</b>.</li>
           <li>✦ <b>Swiftness</b> decides the Turn Order. Faster creatures act more often.</li>
           <li>✦ Skills cost <b>Essence</b>, which refills a little every turn.</li>
-          <li>✦ The <b>Front Row</b> shields the Back Row of its Lane. Pierce skills hit a whole Lane, Sweep skills a whole Row.</li>
+          <li>✦ A Front creature protects the Back creature <b>in its own Lane</b>. A Back creature with no Front ally in its Lane stands open.</li>
+          <li>✦ <b>Lane Rule</b>: attacks go to their own Lane first, else the nearest one, Front before Back. Taunt overrides it.</li>
+          <li>✦ <b>Reach</b>: Single hits one target, Snipe reaches the Back Row and aims there first, Pierce hits a whole Lane, Sweep a whole Row.</li>
           <li>✦ Paragons fill a golden <b>Ascension</b> gauge and unleash their strongest skill on their own.</li>
           <li>✦ After 50 turns the <b>Sigils Surge</b>: damage rises and healing fades, so every battle ends.</li>
-          <li>✦ Bosses blaze their Sigil at half Lifeforce and switch to a fiercer plan.</li>
+          <li>✦ Bosses blaze their Sigil at half Lifeforce and fight fiercer. Tournament champions start the match with a <b>Boss Vow</b>.</li>
         </ul>
       </Section>
 
@@ -139,7 +163,7 @@ export function JournalView() {
           <li>✦ <b>Mastery ★1–5</b>: every skill grows stronger the more it is used.</li>
           <li>✦ <b>Oath Rank I–V</b>: spend Oath Shards on a Paragon for steady growth and a perk at every rank.</li>
           <li>✦ <b>Acolytes</b> grow with every Tournament you win. Challenges recruit new ones.</li>
-          <li>✦ More <b>Tactic Slots</b> unlock with each Act: 2 in Act I, up to 5 in Act IV.</li>
+          <li>✦ <b>New Vows</b>: the First Trial and the first win of every Challenge teach a Vow for your offers.</li>
         </ul>
       </Section>
     </div>

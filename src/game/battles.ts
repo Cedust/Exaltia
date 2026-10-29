@@ -1,19 +1,10 @@
-import { RULES } from '../core/rules'
-import type { Position, StatusId, Team, TeamMember } from '../core/types'
+import type { Position, StatusId } from '../core/types'
 import { CONTENT } from '../data'
 import { FIRST_TRIAL, REGIONS, REGION_BY_ID, type Encounter, type EnemySpec, type Modifier } from '../data/world'
-import { autoPlan } from './autoPlan'
+import { isFrontLiner, newMatch, placeFor, pickBossVows, type DuelMatch, type MatchMember, type SwornVow } from './duel'
 import { enemyLoadout, playerLoadout } from './loadout'
-import { ACOLYTE_MAX_SLOTS, CONDITION_UNLOCKS, FINALE_TIER, REMATCH_TIER, STARTING_CONDITIONS, TACTIC_SLOTS, teamSizeFor } from './rules'
-import { actOf, tournamentsWon, type SaveState } from './save'
-
-const ALL_CONDITIONS = [...STARTING_CONDITIONS, ...CONDITION_UNLOCKS]
-
-/** Tactic Slots a creature of the player gets right now. */
-export function slotsFor(save: SaveState, creatureId: string): number {
-  const slots = TACTIC_SLOTS[actOf(save)]
-  return CONTENT.creatures[creatureId].kind === 'acolyte' ? Math.min(slots, ACOLYTE_MAX_SLOTS) : slots
-}
+import { BEST_OF, BOSS, BOSS_VOWS, ENEMY_LIFEFORCE, FINALE_TIER, OPPONENT_THEMES, REMATCH_TIER, teamSizeFor } from './rules'
+import { tournamentsWon, type SaveState } from './save'
 
 export const F = (lane: 0 | 1 | 2): Position => ({ lane, row: 'front' })
 export const B = (lane: 0 | 1 | 2): Position => ({ lane, row: 'back' })
@@ -133,30 +124,22 @@ export function describeModifier(m: Modifier): string {
   }
 }
 
-/** The CPU team for an encounter: trimmed to the team size, scaled to the tier, with auto plans. */
-export function enemyTeam(save: SaveState, encounter: Encounter): Team {
+/** The CPU team for an encounter: trimmed to the team size and scaled to the tier. */
+export function enemyMembers(save: SaveState, encounter: Encounter): MatchMember[] {
   const rules = battleRules(save, encounter)
-  const slots = Math.min(RULES.maxTacticSlots, Math.max(1, TACTIC_SLOTS[actOf(save)] + (encounter.kind === 'final' || encounter.kind === 'finale' || encounter.kind === 'rematch' ? 1 : 0)))
   const size = encounter.kind === 'trial' ? 2 : rules.teamSize
   const specs = encounter.members.slice(0, size)
-  const isMirror = encounter.kind === 'duel' || encounter.kind === 'finale'
-  return {
-    members: specs.map((spec): TeamMember => {
-      const loadout = enemyLoadout(spec.creature, {
-        tier: rules.tier,
-        boss: spec.boss,
-        teamSize: size,
-        lifeforceFactor: isMirror ? 1.25 : encounter.kind === 'trial' ? 0.7 : undefined,
-      })
-      if (encounter.kind === 'trial') loadout.stats = { ...loadout.stats!, might: Math.round(loadout.stats!.might * 0.75) }
-      if (rules.enemyStatus) loadout.passives = [...(loadout.passives ?? []), { type: 'startStatus', ...rules.enemyStatus }]
-      const skills = (loadout.skills ?? CONTENT.creatures[spec.creature].skills).map((id) => CONTENT.skills[id])
-      const tactics = spec.tactics ?? autoPlan(skills, spec.boss ? Math.max(2, slots - 1) : slots, ALL_CONDITIONS)
-      const member: TeamMember = { creature: spec.creature, position: spec.position, tactics, loadout }
-      if (spec.boss) member.boss = { phase2: autoPlan(skills, slots, ALL_CONDITIONS) }
-      return member
-    }),
-  }
+  return specs.map((spec): MatchMember => {
+    const loadout = enemyLoadout(spec.creature, {
+      tier: rules.tier,
+      boss: spec.boss,
+      teamSize: size,
+      lifeforceFactor: (ENEMY_LIFEFORCE[encounter.kind] ?? 1) * (spec.boss ? BOSS.matchLifeforce : 1),
+    })
+    if (encounter.kind === 'trial') loadout.stats = { ...loadout.stats!, might: Math.round(loadout.stats!.might * 0.75) }
+    if (rules.enemyStatus) loadout.passives = [...(loadout.passives ?? []), { type: 'startStatus', ...rules.enemyStatus }]
+    return { creature: spec.creature, lane: spec.position.lane, row: spec.position.row, loadout, boss: spec.boss }
+  })
 }
 
 /** Problems that keep the current formation from entering this battle, in plain words. */
@@ -164,7 +147,7 @@ export function formationProblems(save: SaveState, encounter: Encounter): string
   const rules = battleRules(save, encounter)
   const problems: string[] = []
   const members = save.formation
-  if (members.length !== rules.teamSize) problems.push(`Place exactly ${rules.teamSize} creature${rules.teamSize > 1 ? 's' : ''} (${members.length} placed).`)
+  if (members.length !== rules.teamSize) problems.push(`Choose exactly ${rules.teamSize} creature${rules.teamSize > 1 ? 's' : ''} (${members.length} chosen).`)
   for (const m of members) {
     const c = CONTENT.creatures[m.creature]
     if (rules.onlyAcolytes && c.kind === 'paragon') problems.push(`${c.name} is a Paragon: this Challenge allows Acolytes only.`)
@@ -173,7 +156,16 @@ export function formationProblems(save: SaveState, encounter: Encounter): string
   return problems
 }
 
-export const isFrontLiner = (id: string) => /^Front|Guardian|Striker|Bulwark|Brawler/.test(CONTENT.creatures[id].role)
+export { isFrontLiner }
+
+/** Whether a creature may enter this encounter. */
+export function allowedIn(rules: BattleRules, id: string): boolean {
+  const c = CONTENT.creatures[id]
+  return !(rules.onlyAcolytes && c.kind === 'paragon') && !rules.banned.includes(c.element)
+}
+
+/** Adds a creature to the formation in its preferred row, from the middle out. */
+export const joinFormation = (formation: SaveState['formation'], id: string): SaveState['formation'] => [...formation, { creature: id, ...placeFor(formation, id) }]
 
 /**
  * Fits the saved formation to an encounter before the pre-battle screen opens: drops creatures the rules forbid,
@@ -181,43 +173,56 @@ export const isFrontLiner = (id: string) => /^Front|Guardian|Striker|Bulwark|Bra
  */
 export function fitFormation(save: SaveState, encounter: Encounter): SaveState['formation'] {
   const rules = battleRules(save, encounter)
-  const allowed = (id: string) => {
-    const c = CONTENT.creatures[id]
-    return !(rules.onlyAcolytes && c.kind === 'paragon') && !rules.banned.includes(c.element)
-  }
   const rank = (id: string) => (CONTENT.creatures[id].kind === 'paragon' ? 1_000_000 + save.creatures[id].xp : 0)
-  let formation = save.formation.filter((f) => save.creatures[f.creature] && allowed(f.creature))
+  let formation = save.formation.filter((f) => save.creatures[f.creature] && allowedIn(rules, f.creature))
   if (formation.length > rules.teamSize) {
     const keep = [...formation].sort((a, b) => rank(b.creature) - rank(a.creature)).slice(0, rules.teamSize)
     formation = formation.filter((f) => keep.includes(f))
   }
-  const candidates = save.order.filter((id) => allowed(id) && !formation.some((f) => f.creature === id)).sort((a, b) => rank(b) - rank(a))
-  const free = (row: 'front' | 'back') =>
-    ([1, 0, 2] as const).map((lane) => ({ lane, row })).find((p) => !formation.some((f) => f.position.lane === p.lane && f.position.row === p.row))
+  const candidates = save.order.filter((id) => allowedIn(rules, id) && !formation.some((f) => f.creature === id)).sort((a, b) => rank(b) - rank(a))
   for (const id of candidates) {
     if (formation.length >= rules.teamSize) break
-    const position = free(isFrontLiner(id) ? 'front' : 'back') ?? free(isFrontLiner(id) ? 'back' : 'front')
-    if (position) formation = [...formation, { creature: id, position }]
+    formation = joinFormation(formation, id)
   }
   return formation
 }
 
-export function playerTeam(save: SaveState): Team {
+/** The player's team for a match: the saved formation with each creature's current strength. */
+export function playerMembers(save: SaveState): MatchMember[] {
   const won = tournamentsWon(save)
-  return {
-    members: save.formation.map((f) => {
-      const owned = save.creatures[f.creature]
-      const loadout = playerLoadout(owned, won)
-      const usable = loadout.skills ?? CONTENT.creatures[f.creature].skills
-      const tactics = (save.tactics[f.creature] ?? []).filter((t) => usable.includes(t.skill)).slice(0, slotsFor(save, f.creature))
-      return { creature: f.creature, position: f.position, tactics, loadout }
-    }),
-  }
+  return save.formation.map((f) => ({ creature: f.creature, lane: f.lane, row: f.row, loadout: playerLoadout(save.creatures[f.creature], won) }))
 }
 
-/** Suggested Battle Plan for a creature of the player, from its current skills and unlocked Conditions. */
-export function suggestPlan(save: SaveState, creatureId: string) {
-  const loadout = playerLoadout(save.creatures[creatureId], tournamentsWon(save))
-  const skills = (loadout.skills ?? CONTENT.creatures[creatureId].skills).map((id) => loadout.skillDefs?.[id] ?? CONTENT.skills[id])
-  return autoPlan(skills, slotsFor(save, creatureId), save.conditions)
+// ── Matches ──
+
+export function bestOfFor(encounter: Encounter): number {
+  if (encounter.kind === 'challenge') return encounter.modifiers?.some((m) => m.type === 'teamSize' && m.size === 1) ? BEST_OF.challenge1v1 : BEST_OF.challenge
+  return BEST_OF[encounter.kind]
+}
+
+/** The opponent's Vow theme: Cassian has his own, everyone else follows their home. */
+export function themeOf(encounter: Encounter) {
+  const key = encounter.opponent.startsWith('Cassian') ? 'cassian' : encounter.backdrop
+  return OPPONENT_THEMES[key] ?? OPPONENT_THEMES.spire
+}
+
+/** Vows the opponent holds before round 1 (Tournament finals, the finale and Rematches). */
+export function bossVowsFor(save: SaveState, encounter: Encounter): SwornVow[] {
+  const count = BOSS_VOWS[encounter.kind] ?? 0
+  return count > 0 ? pickBossVows(enemyMembers(save, encounter), themeOf(encounter).prefers, count) : []
+}
+
+export function startMatch(save: SaveState, encounter: Encounter, seed: number): DuelMatch {
+  return newMatch({
+    name: encounter.name,
+    opponent: encounter.opponent,
+    backdrop: encounter.backdrop,
+    bestOf: bestOfFor(encounter),
+    seed,
+    player: playerMembers(save),
+    enemy: enemyMembers(save, encounter),
+    playerPool: save.vows,
+    prefers: themeOf(encounter).prefers,
+    bossVows: bossVowsFor(save, encounter),
+  })
 }

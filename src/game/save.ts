@@ -1,5 +1,6 @@
-import type { Condition, Position, Tactic } from '../core/types'
-import { STARTING_CONDITIONS, type Act } from './rules'
+import type { Lane, Row } from '../core/types'
+import { withLanes } from './duel'
+import { CHALLENGE_VOWS, STARTING_VOWS, TOURNAMENT_VOWS, TRIAL_VOW, type Act } from './rules'
 
 export interface OwnedCreature {
   id: string
@@ -39,11 +40,12 @@ export interface SaveState {
   /** Paragons Cassian took (always the one you did not choose). */
   cassian: string[]
   rematches: string[]
-  conditions: Condition['type'][]
+  /** Vow ids the player can be offered in matches. */
+  vows: string[]
   /** Story scenes already shown. */
   seen: string[]
-  formation: { creature: string; position: Position }[]
-  tactics: Record<string, Tactic[]>
+  /** The team for the next match, in order, with the cell (Lane and Row) each creature starts in. */
+  formation: { creature: string; lane: Lane; row: Row }[]
   finale: { won: boolean; ending?: 'oath' | 'unbound' }
   stats: { battles: number; wins: number }
   speed: number
@@ -66,10 +68,9 @@ export function newSave(name: string): SaveState {
     duels: [],
     cassian: [],
     rematches: [],
-    conditions: [...STARTING_CONDITIONS],
+    vows: [...STARTING_VOWS],
     seen: [],
     formation: [],
-    tactics: {},
     finale: { won: false },
     stats: { battles: 0, wins: 0 },
     speed: 1,
@@ -98,10 +99,38 @@ export function loadSave(): SaveState | null {
     const parsed = JSON.parse(raw) as SaveState
     if (parsed?.version !== 1 || typeof parsed.name !== 'string') return null
     // Fill fields added after the save was written.
-    return { ...newSave(parsed.name), ...parsed }
+    return upgradeSave({ ...newSave(parsed.name), ...parsed })
   } catch {
     return null
   }
+}
+
+/** Vows a journey has earned so far: the starting set, the First Trial, Tournaments and every Challenge won. */
+export function earnedVows(save: Pick<SaveState, 'firstTrialWon' | 'challenges' | 'tournamentOrder'>): string[] {
+  const vows = [...STARTING_VOWS]
+  if (save.firstTrialWon) vows.push(TRIAL_VOW)
+  vows.push(...TOURNAMENT_VOWS.slice(0, save.tournamentOrder.length))
+  for (const id of save.challenges) if (CHALLENGE_VOWS[id]) vows.push(CHALLENGE_VOWS[id])
+  return vows
+}
+
+/**
+ * Older saves: Conditions and Tactics give way to Vows, formations get a cell (Lane and Row) each, and Vows
+ * added since the save was written are filled in.
+ */
+export function upgradeSave(loaded: SaveState): SaveState {
+  const save = { ...loaded } as SaveState & { conditions?: unknown; tactics?: unknown }
+  const legacy = save.conditions !== undefined
+  delete save.conditions
+  delete save.tactics
+  const formation = withLanes(
+    save.formation.map((f) => {
+      const old = f as { creature: string; lane?: Lane; row?: Row; position?: { lane: Lane; row: Row } }
+      return { creature: old.creature, lane: old.position?.lane ?? old.lane, row: old.row ?? old.position?.row ?? 'front' }
+    }),
+  )
+  const vows = legacy ? earnedVows(save) : [...save.vows, ...earnedVows(save).filter((v) => !save.vows.includes(v))]
+  return { ...save, formation, vows }
 }
 
 export function writeSave(save: SaveState): boolean {

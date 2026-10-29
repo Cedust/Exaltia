@@ -95,15 +95,40 @@ describe('runBattle', () => {
     expect(actions[1].skill).toBe('basic')
   })
 
-  it('protects the Back Row while the Front Row stands, unless the skill ignores protection', () => {
-    const enemy = team(member('b', 0, 'front'), member('b', 1, 'back'))
-    const pick = (skillId: string) => {
+  it('protects a Back unit only while a Front ally stands in its Lane, a Snipe reaches past it and aims at the Back first', () => {
+    const pick = (enemy: Team, skillId: string, lane: 0 | 1 | 2 = 1, units = c) => {
       const tactics = [{ condition: { type: 'always' as const }, skill: skillId, target: 'sameLane' as const }]
-      const result = runBattle({ player: team(member('fast', 1, 'front', tactics)), enemy, seed: 1 }, c)
+      const result = runBattle({ player: team(member('fast', lane, 'front', tactics)), enemy, seed: 1 }, units)
       return ofType(result.events, 'actionChosen')[0].targets
     }
-    expect(pick('strike')).toEqual(['enemy-0'])
-    expect(pick('snipe')).toEqual(['enemy-1'])
+    const guarded = team(member('b', 1, 'front'), member('b', 1, 'back'), member('b', 0, 'back'))
+    // The Middle Back is guarded; the Top Back has no Front ally in its Lane and is open.
+    expect(pick(guarded, 'strike')).toEqual(['enemy-0'])
+    expect(pick(guarded, 'strike', 0)).toEqual(['enemy-2'])
+    expect(pick(guarded, 'snipe')).toEqual(['enemy-1'])
+    expect(pick(team(member('b', 1, 'front'), member('b', 0, 'back')), 'snipe')).toEqual(['enemy-0'])
+    // Own Lane first, even an open Back unit before a Front unit in another Lane.
+    expect(pick(team(member('b', 0, 'front'), member('b', 1, 'back')), 'strike')).toEqual(['enemy-1'])
+    // From the Middle with no one there: the nearest Lanes tie, the lower Lifeforce share wins, then Top.
+    expect(pick(team(member('b', 2, 'front'), member('b', 0, 'front')), 'strike')).toEqual(['enemy-1'])
+  })
+
+  it('lets Phalanx guard neighbouring Lanes and Lane Lock force attackers in its Lane', () => {
+    const pick = (enemy: Team, units: Content) => {
+      const tactics = [{ condition: { type: 'always' as const }, skill: 'strike', target: 'sameLane' as const }]
+      const result = runBattle({ player: team(member('fast', 0, 'front', tactics)), enemy, seed: 1 }, units)
+      return ofType(result.events, 'actionChosen')[0].targets
+    }
+    const phalanx = creature('phalanx')
+    const locked = creature('locked')
+    const units = content(creature('fast', { stats: stats({ swiftness: 100 }) }), creature('b'), phalanx, locked)
+    const shield = (id: string, passive: 'phalanx' | 'laneLock', lane: 0 | 1 | 2, row: 'front' | 'back'): TeamMember => ({
+      ...member(id, lane, row),
+      loadout: { passives: [{ type: passive, label: passive }] },
+    })
+    expect(pick(team(member('b', 1, 'front'), member('b', 0, 'back')), units)).toEqual(['enemy-1'])
+    expect(pick(team(shield('phalanx', 'phalanx', 1, 'front'), member('b', 0, 'back')), units)).toEqual(['enemy-0'])
+    expect(pick(team(member('b', 0, 'front'), shield('locked', 'laneLock', 0, 'back'), member('b', 1, 'front')), units)).toEqual(['enemy-0'])
   })
 
   it('expands Pierce to the whole Lane and Sweep to the whole Row', () => {
@@ -163,13 +188,13 @@ describe('runBattle', () => {
     expect(() => runBattle({ player: team(member('nope', 1, 'front')), enemy: team(member('b', 1, 'front')), seed: 1 }, c)).toThrow(/Unknown creature/)
   })
 
-  it('writes a Battle Log line naming the Tactic for every action', () => {
+  it('writes a Battle Log line naming actor, skill and targets for every action', () => {
     const tactics = [{ condition: { type: 'always' as const }, skill: 'strike', target: 'sameLane' as const }]
     const result = runBattle({ player: team(member('a', 1, 'front', tactics)), enemy: team(member('b', 1, 'front')), seed: 1 }, c)
     const log = formatBattleLog(result.events)
     const actionLines = log.map((line) => line.text).filter((text) => text.includes(' → '))
     expect(actionLines.length).toBe(ofType(result.events, 'actionChosen').length)
-    for (const line of actionLines) expect(line).toMatch(/Tactic \d: |Fallback: no Tactic matched/)
+    for (const line of actionLines) expect(line).toMatch(/^ {2}(a|b) → \w+ → (a|b)/)
   })
 })
 

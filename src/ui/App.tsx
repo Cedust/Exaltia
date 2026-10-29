@@ -1,25 +1,23 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { runBattle } from '../core/battle'
-import type { BattleResult, Position } from '../core/types'
-import { CONTENT } from '../data'
+import type { BattleResult } from '../core/types'
 import { SCENES } from '../data/story'
 import { FIRST_TRIAL, type Encounter } from '../data/world'
-import { battleRules, DUELS, enemyTeam, findAnyEncounter, fitFormation, isFrontLiner, playerTeam, suggestPlan } from '../game/battles'
-import { addCreature, applyBattle, chooseParagon, openDuel, spireAction, type BattleReport } from '../game/campaign'
+import { battleRules, DUELS, findAnyEncounter, fitFormation, joinFormation, startMatch } from '../game/battles'
+import { addCreature, applyMatch, chooseParagon, openDuel, spireAction, type BattleReport } from '../game/campaign'
+import type { DuelMatch } from '../game/duel'
 import { deleteSave, loadSave, newSave, tournamentsWon, writeSave, type SaveState } from '../game/save'
 import { GameContext } from './GameContext'
 import { EndingChoiceScreen, OathScreen, ParagonChoiceScreen, ResultScreen } from './screens/AftermathScreens'
-import { BattleScreen } from './screens/BattleScreen'
 import { CollectionView, CreatureScreen } from './screens/CollectionScreens'
 import { Hub, JournalView, MenuView, type HubTab } from './screens/HubScreens'
 import { MapView } from './screens/MapView'
+import { MatchScreen } from './screens/MatchScreen'
 import { PreBattleScreen } from './screens/PreBattleScreen'
 import { RegionSheet } from './screens/RegionSheet'
 import { StarterScreen } from './screens/StarterScreen'
 import { NameScreen, StoryScreen } from './screens/StoryScreen'
 import { TitleScreen } from './screens/TitleScreen'
 import { TournamentScreen } from './screens/TournamentScreen'
-import { VowDuelScreen } from './screens/VowDuelScreen'
 
 /** Where to go after a battle (or when leaving the pre-battle screen). */
 type Return = { kind: 'hub' } | { kind: 'tournament'; regionId: string }
@@ -33,24 +31,18 @@ type Step =
   | { kind: 'tournament'; regionId: string }
   | { kind: 'creature'; id: string }
   | { kind: 'prebattle'; encounterId: string; back: Return }
-  | { kind: 'battle'; encounter: Encounter; result: BattleResult; tier: number; back: Return; id: number }
+  | { kind: 'match'; encounter: Encounter; match: DuelMatch; tier: number; back: Return; id: number }
   | { kind: 'result'; encounter: Encounter; report: BattleReport; back: Return }
   | { kind: 'choose'; regionId: string }
   | { kind: 'oath'; paragonId: string; memory: number }
   | { kind: 'ending' }
-  | { kind: 'vowDuel' }
 
 const newSeed = () => Math.floor(Math.random() * 1_000_000)
 const story = (scene: string): Step => ({ kind: 'story', scene })
 
 /** First formation from the two starters: Front-liners in front, the rest behind them. */
 function starterFormation(picks: string[]): SaveState['formation'] {
-  const fronts: (0 | 1 | 2)[] = [1, 0, 2]
-  const backs: (0 | 1 | 2)[] = [1, 2, 0]
-  return picks.map((creature) => {
-    const position: Position = isFrontLiner(creature) ? { lane: fronts.shift()!, row: 'front' } : { lane: backs.shift()!, row: 'back' }
-    return { creature, position }
-  })
+  return picks.reduce<SaveState['formation']>(joinFormation, [])
 }
 
 export default function App() {
@@ -100,10 +92,7 @@ export default function App() {
     setSave((s) => {
       const encounter = s && findAnyEncounter(s, encounterId)
       if (!s || !encounter) return s
-      const formation = fitFormation(s, encounter)
-      const tactics = { ...s.tactics }
-      for (const f of formation) if (!tactics[f.creature]?.length) tactics[f.creature] = suggestPlan({ ...s, formation }, f.creature)
-      return { ...s, formation, tactics }
+      return { ...s, formation: fitFormation(s, encounter) }
     })
 
   const onSpire = () => {
@@ -126,15 +115,15 @@ export default function App() {
     const encounter = findAnyEncounter(save, encounterId)
     if (!encounter) return
     const rules = battleRules(save, encounter)
-    const result = runBattle({ player: playerTeam(save), enemy: enemyTeam(save, encounter), seed: newSeed() }, CONTENT)
+    const match = startMatch(save, encounter, newSeed())
     setBattleId((n) => n + 1)
-    play({ kind: 'battle', encounter, result, tier: rules.tier, back, id: battleId + 1 })
+    play({ kind: 'match', encounter, match, tier: rules.tier, back, id: battleId + 1 })
   }
 
-  const finishBattle = (step: Extract<Step, { kind: 'battle' }>) => {
+  const finishMatch = (step: Extract<Step, { kind: 'match' }>, match: DuelMatch, results: BattleResult[]) => {
     if (!save) return
     const firstTrial = !save.firstTrialWon
-    const { save: next, report } = applyBattle(save, step.encounter, step.result, step.tier)
+    const { save: next, report } = applyMatch(save, step.encounter, match, results, step.tier)
     setSave(next)
     const after: Step[] = []
     if (report.won && !report.chooseParagonIn) {
@@ -167,7 +156,6 @@ export default function App() {
           <TitleScreen
             hasSave={hasSave}
             onNew={newJourney}
-            onDuel={() => play({ kind: 'vowDuel' })}
             onContinue={() => {
               const loaded = loadSave()
               if (!loaded) return newJourney()
@@ -209,10 +197,8 @@ export default function App() {
             onDone={(picks) => {
               setSave((s) => {
                 if (!s) return s
-                let next = picks.reduce(addCreature, s)
-                next = { ...next, formation: starterFormation(picks) }
-                const tactics = Object.fromEntries(picks.map((id) => [id, suggestPlan(next, id)]))
-                return { ...next, tactics }
+                const next = picks.reduce(addCreature, s)
+                return { ...next, formation: starterFormation(picks) }
               })
               play(story('prologue-3'), { kind: 'hub' })
             }}
@@ -275,15 +261,16 @@ export default function App() {
           </div>
         )
       }
-      case 'battle':
+      case 'match':
         return (
-          <BattleScreen
+          <MatchScreen
             key={screen.id}
             encounter={screen.encounter}
-            result={screen.result}
+            initial={screen.match}
             speed={save!.speed}
             onSpeed={(speed) => setSave((s) => (s ? { ...s, speed } : s))}
-            onDone={() => finishBattle(screen)}
+            onDone={(match, results) => finishMatch(screen, match, results)}
+            onForfeit={() => play({ kind: 'prebattle', encounterId: screen.encounter.id, back: screen.back })}
           />
         )
       case 'result':
@@ -292,8 +279,6 @@ export default function App() {
         return <ParagonChoiceScreen regionId={screen.regionId} onChoose={(p) => choose(screen.regionId, p)} />
       case 'oath':
         return <OathScreen paragonId={screen.paragonId} memoryIndex={screen.memory} onDone={advance} />
-      case 'vowDuel':
-        return <VowDuelScreen onExit={() => play({ kind: 'title' })} />
       case 'ending':
         return (
           <EndingChoiceScreen

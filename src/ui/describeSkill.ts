@@ -2,7 +2,10 @@ import { elementName } from '../core/log'
 import { statusName } from '../core/statuses'
 import type { SkillDef } from '../core/types'
 
-const PATTERN_LABELS = { single: 'Single', pierce: 'Pierce', sweep: 'Sweep', all: 'All' }
+const PATTERN_LABELS = { single: 'Single', pierce: 'Pierce (Lane)', sweep: 'Sweep (Row)', all: 'All' }
+
+/** The Reach of a skill: Single, Snipe (reaches the Back Row and aims there first), Pierce, Sweep or All. */
+export const reachOf = (skill: SkillDef) => (skill.pattern === 'single' && skill.ignoresProtection && skill.effect === 'damage' ? 'Snipe' : PATTERN_LABELS[skill.pattern])
 
 function kindLabel(skill: SkillDef): string {
   const element = skill.element === 'physical' ? '' : `${elementName(skill.element)} `
@@ -17,11 +20,11 @@ function kindLabel(skill: SkillDef): string {
 export function describeSkill(skill: SkillDef): string {
   const parts = [kindLabel(skill)]
   if (skill.selfOnly) parts.push('Self')
-  else parts.push(PATTERN_LABELS[skill.pattern])
+  else parts.push(reachOf(skill))
   if (skill.revive) parts.push(`${Math.round(skill.power * 100)}% Lifeforce`)
   else if (skill.effect !== 'buff') parts.push(`Power ${skill.power}`)
   parts.push(skill.cost > 0 ? `${skill.cost} ESS` : 'free')
-  if (skill.ignoresProtection) parts.push('reaches Back Row')
+  if (skill.ignoresProtection && skill.pattern !== 'single') parts.push('reaches Back Row')
   if (skill.piercesDefense) parts.push('ignores defense')
   if (skill.inflicts) {
     const chance = skill.inflicts.chance >= 1 ? '' : `${Math.round(skill.inflicts.chance * 100)}% `

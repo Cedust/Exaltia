@@ -1,6 +1,6 @@
 import { isWeakTo } from './rules'
 import type { Condition, SkillDef, TargetPriority } from './types'
-import { hasStatus, isAlive, lifeforceRatio, type Unit } from './unit'
+import { hasPassive, hasStatus, isAlive, lifeforceRatio, type Unit } from './unit'
 
 /** Units a skill may pick as its primary target, before the Target Priority chooses one. */
 export function candidates(skill: SkillDef, actor: Unit, units: Unit[]): Unit[] {
@@ -13,12 +13,24 @@ export function candidates(skill: SkillDef, actor: Unit, units: Unit[]): Unit[] 
   }
   if (skill.effect === 'buff') return units.filter((u) => u.side === actor.side && isAlive(u) && lacksBuff(u))
   const enemies = units.filter((u) => u.side !== actor.side && isAlive(u))
-  // The Back Row is protected while anyone stands in the Front Row.
-  const front = enemies.filter((u) => u.position.row === 'front')
-  const reachable = skill.ignoresProtection || front.length === 0 ? enemies : front
-  // Taunt: attacks must aim at a taunting creature when they can reach one.
-  const taunting = reachable.filter((u) => hasStatus(u, 'taunt'))
-  return taunting.length > 0 ? taunting : reachable
+  // Snipe skills ignore protection; otherwise a Back unit is safe while a Front ally guards its Lane.
+  const reachable = skill.ignoresProtection ? enemies : enemies.filter((u) => !isProtected(u, units))
+  // Taunt, and Lane Lock for attackers in its Lane: attacks must aim there when they can reach it.
+  const forced = reachable.filter((u) => hasStatus(u, 'taunt') || (u.position.lane === actor.position.lane && hasPassive(u, 'laneLock')))
+  return forced.length > 0 ? forced : reachable
+}
+
+/**
+ * Protection per Lane: a Back unit is protected while a living Front ally stands in the same Lane.
+ * With Phalanx, Front allies also guard the Back Row of the neighbouring Lanes.
+ */
+export function isProtected(unit: Unit, units: Unit[]): boolean {
+  if (unit.position.row !== 'back') return false
+  return units.some((f) => {
+    if (f.side !== unit.side || !isAlive(f) || f.position.row !== 'front') return false
+    const distance = Math.abs(f.position.lane - unit.position.lane)
+    return distance === 0 || (distance === 1 && hasPassive(f, 'phalanx'))
+  })
 }
 
 /**
@@ -63,7 +75,9 @@ function score(priority: TargetPriority, unit: Unit, actor: Unit, skill: SkillDe
     case 'weakToSkill':
       return (isWeakTo(unit.creature.element, skill.element) ? 0 : 1) + lifeforceRatio(unit) / 2
     case 'sameLane':
-      return Math.abs(unit.position.lane - actor.position.lane)
+      // The Lane Rule: own Lane first, else the nearest; Front before Back (a Snipe aims at the Back first);
+      // then the lower Lifeforce share, then Top.
+      return Math.abs(unit.position.lane - actor.position.lane) * 10 + ((unit.position.row === 'back') !== !!skill.ignoresProtection ? 2 : 0) + lifeforceRatio(unit)
     case 'self':
       return unit === actor ? 0 : Infinity
   }

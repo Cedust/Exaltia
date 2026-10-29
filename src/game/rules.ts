@@ -15,11 +15,6 @@ export const ACT_NAMES: Record<Act, string> = {
   act4: 'Act IV · Beyond the Oath',
 }
 
-/** Tactic Slots hang on the Act and are the same for every Paragon (Prologue 1 ... Act 4 5). */
-export const TACTIC_SLOTS: Record<Act, number> = { prologue: 1, act1: 2, act2: 3, act3: 4, act4: 5 }
-/** Acolytes have simpler kits and never more than 3 Tactics. */
-export const ACOLYTE_MAX_SLOTS = 3
-
 /** Default team size by Tournaments won: 2v2 at the start, 3v3 from the third, 4v4 in the late game. */
 export function teamSizeFor(tournamentsWon: number): number {
   if (tournamentsWon >= 6) return 4
@@ -118,16 +113,23 @@ export const BOSS = {
   attributeBase: 0.56,
   attributePerTier: 0.06,
   attributeMax: 1,
+  /** Bosses fight several rounds in a match, so each round they bring less Lifeforce than a single long battle. */
+  matchLifeforce: 0.5,
 }
+/** Enemy Lifeforce by encounter kind: Cassian's 1v1 duels get more; the finale (four tier-8 Paragons, best of 7) and the First Trial less. */
+export const ENEMY_LIFEFORCE: Record<string, number> = { duel: 1.25, finale: 0.5, trial: 0.55 }
 export const FINALE_TIER = 8
 export const REMATCH_TIER = 10
 
 // ── Oath Shards ──
 export const SHARD_REWARDS = { trial: 5, match: 4, final: 8, tournament: 12, challenge: 6, challengeRepeat: 2, duel: 10, finale: 20, rematch: 15 }
 
-/** Conditions known from the start; the others unlock one by one with each new Challenge (and the First Trial). */
-export const STARTING_CONDITIONS = ['always', 'enemyWeakTo', 'allyLifeforceBelow', 'selfEssenceAtLeast'] as const
-export const CONDITION_UNLOCKS = [
+/** Conditions the automatic role behaviour (auto plan) may use. */
+export const ALL_CONDITIONS = [
+  'always',
+  'enemyWeakTo',
+  'allyLifeforceBelow',
+  'selfEssenceAtLeast',
   'enemiesAtLeast',
   'enemyWithoutStatus',
   'allyWithoutStatus',
@@ -135,3 +137,62 @@ export const CONDITION_UNLOCKS = [
   'enemyHasStatus',
   'enemyLifeforceBelow',
 ] as const
+
+// ── Vow Duels ──
+
+/** Best of X by encounter kind (Challenges: Bo1, 1v1 Challenges Bo3). */
+export const BEST_OF = { trial: 3, match: 5, final: 5, challenge: 1, challenge1v1: 3, duel: 3, finale: 7, rematch: 5 }
+/** Boss Vows the opponent already holds when the match begins. */
+export const BOSS_VOWS: Record<string, number> = { final: 1, finale: 2, rematch: 2 }
+
+/** Vows the player knows from the start. */
+export const STARTING_VOWS = [
+  'stoneskin',
+  'quickened-step',
+  'keen-edge',
+  'vigil',
+  'second-wind',
+  'mending-light',
+  'fireproof',
+  'blood-price',
+  'opening-gambit',
+  'undying-oath',
+  'vanguard',
+  'shieldwall',
+]
+export const TRIAL_VOW = 'dawnbreak'
+/** Position Vows taught by the first, second, third and fourth Tournament won (any region). */
+export const TOURNAMENT_VOWS = ['flanker', 'lane-lock', 'open-lane', 'phalanx']
+/** Each region's Challenges teach a Vow that fits the region (first win only). */
+export const CHALLENGE_VOWS: Record<string, string> = {
+  'radiance-c1': 'shatter-ward',
+  'radiance-c2': 'cleansing-oath',
+  'wind-c1': 'split-the-flame',
+  'wind-c2': 'deep-well',
+  'thunder-c1': 'anchor',
+  'thunder-c2': 'avenger',
+  'fire-c1': 'kindling',
+  'fire-c2': 'ember-covenant',
+  'umbra-c1': 'lingering-wound',
+  'umbra-c2': 'mirror-oath',
+  'earth-c1': 'last-breath',
+  'earth-c2': 'glass-vanguard',
+  'water-c1': 'turned-tide',
+  'water-c2': 'wildfire',
+  'ice-c1': 'frostbite',
+  'ice-c2': 'steam-burst',
+}
+
+/** What each opponent likes to swear, by backdrop (region, the Spire constructs, or Cassian). */
+export const OPPONENT_THEMES: Record<string, { theme: string; prefers: string[] }> = {
+  radiance: { theme: 'Light and Renewal', prefers: ['mending-light', 'cleansing-oath', 'shatter-ward', 'dawnbreak', 'vigil', 'second-wind'] },
+  wind: { theme: 'Speed and Reach', prefers: ['quickened-step', 'split-the-flame', 'opening-gambit', 'keen-edge', 'deep-well', 'dawnbreak'] },
+  thunder: { theme: 'Speed and Strikes', prefers: ['quickened-step', 'opening-gambit', 'split-the-flame', 'avenger', 'keen-edge', 'shatter-ward'] },
+  fire: { theme: 'Burn and Bargains', prefers: ['kindling', 'lingering-wound', 'ember-covenant', 'blood-price', 'wildfire', 'glass-vanguard'] },
+  umbra: { theme: 'Wounds and Tricks', prefers: ['lingering-wound', 'blood-price', 'avenger', 'last-breath', 'keen-edge', 'turned-tide'] },
+  earth: { theme: 'Walls and Retribution', prefers: ['stoneskin', 'anchor', 'glass-vanguard', 'last-breath', 'vigil', 'avenger'] },
+  water: { theme: 'Tides and Healing', prefers: ['mending-light', 'second-wind', 'turned-tide', 'cleansing-oath', 'deep-well', 'undying-oath'] },
+  ice: { theme: 'Chill and Endurance', prefers: ['frostbite', 'stoneskin', 'vigil', 'anchor', 'last-breath', 'undying-oath'] },
+  spire: { theme: 'Stone and Patience', prefers: ['stoneskin', 'vigil', 'second-wind'] },
+  cassian: { theme: 'Chains and Bargains', prefers: ['blood-price', 'glass-vanguard', 'keen-edge', 'opening-gambit', 'dawnbreak', 'undying-oath'] },
+}

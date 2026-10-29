@@ -59,9 +59,11 @@ const list: Scene[] = [
     lines: [
       h('They have chosen you as much as you have chosen them. Good.'),
       h('Before you set foot outside these ruins, you will pass the First Trial. My old constructs will test whether you can think before you fight.'),
-      t("In a fight you don't actually do anything! You tell your creatures what to do beforehand. That's the Battle Plan."),
-      h('Each creature follows its Tactics from top to bottom. The first one that fits is used. If none fits, it simply attacks.'),
-      h('Mind the Lanes. A creature in the Front Row shields the one behind it, but some attacks pierce a whole Lane.'),
+      t("And the best part: you don't fight yourself! Your creatures know their craft. You choose who fights and where they stand."),
+      h('Every match is fought in rounds. Before each round your opponent swears a Vow, and then you answer with one of your own.'),
+      h('A Vow is a promise of power: a tougher hide, a swifter step, a flame that spreads. It holds until the match is over, so choose with care.'),
+      h('And mind the field. A creature in the Front shields only the one behind it in the same Lane, and every attack strikes its own Lane first.'),
+      h('So place your creatures with intent: whoever stands across from an enemy is the one it will strike.'),
     ],
   },
   {
@@ -109,7 +111,7 @@ const list: Scene[] = [
       h('But so does Cassian. He holds four Paragons in chains now, and he is not collecting them for company.'),
       t('The memories, Hesper. Every Paragon shows {name} one. They are all sad. Why are they all sad?'),
       h('Because they are true. Keep listening to them.'),
-      n('Your creatures have grown wiser on the road: every Paragon can now follow three Tactics.'),
+      n('Four Challenges and more wait in every region, and each first victory there teaches a new Vow.'),
     ],
   },
   {
@@ -137,7 +139,7 @@ const list: Scene[] = [
       n('The ground trembles. Golden chains of light rise from the heart of the ruins and drag the broken stones together into a tower.'),
       h('Cassian. He is forcing the old Oath back into the Spire with the Paragons he has chained. If he finishes, they will be servants forever.'),
       t('Then we stop him. Right, {name}? Right?'),
-      n('Every Paragon can now follow four Tactics. The Spire waits.'),
+      n('Cassian waits at the top of the Spire. Four against four, best of seven.'),
     ],
   },
   {

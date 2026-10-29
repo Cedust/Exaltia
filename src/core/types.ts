@@ -115,6 +115,10 @@ export type Passive =
   | { type: 'splash'; percent: number; label: string }
   | { type: 'burnSpread'; turns: number; label: string }
   | { type: 'steamBurst'; percent: number; label: string }
+  // Position Vows: Shieldwall (less damage with an ally behind), Lane Lock (forces attackers in its Lane), Phalanx.
+  | { type: 'shieldwall'; percent: number; label: string }
+  | { type: 'laneLock'; label: string }
+  | { type: 'phalanx'; label: string }
 
 export type Condition =
   | { type: 'always' }

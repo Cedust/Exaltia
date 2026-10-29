@@ -1,4 +1,5 @@
 import type { Element } from '../core/types'
+import type { Rarity } from '../game/vows'
 
 export const ELEMENT_TEXT: Record<Element, string> = {
   fire: 'text-fire',
@@ -40,3 +41,10 @@ export const ELEMENT_HEX: Record<Element, string> = {
 export const artUrl = (creatureId: string) => `art/creatures/${creatureId}.webp`
 export const characterUrl = (id: string) => `art/characters/${id}.webp`
 export const backdropUrl = (id: string) => `art/backdrops/${id}.webp`
+
+/** Vow card colours by rarity. */
+export const RARITY_STYLE: Record<Rarity, { label: string; color: string; ring: string }> = {
+  common: { label: 'Common', color: 'text-[#d3d8e2]', ring: 'border-[#9aa3b5]/50' },
+  rare: { label: 'Rare', color: 'text-[#a9c4ff]', ring: 'border-[#7d9cff]/70 shadow-[0_0_18px_rgba(125,156,255,0.25)]' },
+  exalted: { label: 'Exalted', color: 'text-gold-bright', ring: 'border-gold shadow-[0_0_26px_rgba(230,196,122,0.45)]' },
+}
