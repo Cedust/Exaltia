@@ -50,8 +50,8 @@ export function TournamentScreen({ regionId, onBack, onPrepare }: { regionId: st
                     {done ? '✓' : final ? '♛' : i + 1}
                   </div>
                   <div className="min-w-0 flex-1">
-                    <div className="label-caps !text-[0.6rem]">{match.name}</div>
-                    <div className="truncate font-display text-base tracking-wide text-ivory">{match.opponent}</div>
+                    <div className="label-caps !text-2xs">{match.name}</div>
+                    <div className="font-display text-base leading-tight tracking-wide text-ivory">{match.opponent}</div>
                     <div className="text-xs text-mist">
                       {rules.teamSize}v{rules.teamSize} · Bo{bestOfFor(match)}
                       {final ? ' · Boss battle' : ''}

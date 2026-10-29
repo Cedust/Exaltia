@@ -67,8 +67,8 @@ export function RegionSheet({
             <div key={id} className="ornate-soft flex flex-col items-center p-2 text-center">
               <CreatureArt creature={creature} className="h-24 w-full" />
               <span className="font-display text-sm text-gold-bright">{creature.name}</span>
-              <span className="text-[0.7rem] text-mist">{creature.role}</span>
-              <span className={`mt-1 text-[0.65rem] uppercase tracking-widest ${mine ? 'text-gold' : chained ? 'text-red-300' : 'text-mist/70'}`}>
+              <span className="text-xs text-mist">{creature.role}</span>
+              <span className={`mt-1 text-xs uppercase tracking-widest ${mine ? 'text-gold' : chained ? 'text-red-300' : 'text-mist/70'}`}>
                 {mine ? (id === chosen ? 'Sworn to you' : 'Freed & sworn') : chained ? 'Chained by Cassian' : 'Awaits a worthy Oath'}
               </span>
             </div>
@@ -129,14 +129,14 @@ export function RegionSheet({
                     <div className="text-xs leading-snug text-mist">{challenge.description}</div>
                     <div className="mt-1 flex flex-wrap gap-1">
                       {(challenge.modifiers ?? []).map((m, j) => (
-                        <span key={j} className="rounded-sm border border-gold/30 bg-black/30 px-1.5 text-[0.65rem] uppercase tracking-wider text-gold">
+                        <span key={j} className="rounded-sm border border-gold/30 bg-black/30 px-1.5 text-xs uppercase tracking-wider text-gold">
                           {describeModifier(m)}
                         </span>
                       ))}
-                      <span className={`rounded-sm px-1.5 text-[0.65rem] uppercase tracking-wider ${done ? 'bg-gold/20 text-gold-bright' : 'bg-white/5 text-ivory/80'}`}>
+                      <span className={`rounded-sm px-1.5 text-xs uppercase tracking-wider ${done ? 'bg-gold/20 text-gold-bright' : 'bg-white/5 text-ivory/80'}`}>
                         {done ? '✓ Won · replay for XP' : `Reward: ${recruit.name} · Vow: ${VOW_BY_ID[CHALLENGE_VOWS[challenge.id]].name}`}
                       </span>
-                      <span className="rounded-sm bg-white/5 px-1.5 text-[0.65rem] uppercase tracking-wider text-ivory/80">Bo{bestOfFor(challenge)}</span>
+                      <span className="rounded-sm bg-white/5 px-1.5 text-xs uppercase tracking-wider text-ivory/80">Bo{bestOfFor(challenge)}</span>
                     </div>
                   </div>
                 </button>

@@ -166,7 +166,7 @@ export function ParagonChoiceScreen({ regionId, onChoose }: { regionId: string; 
               <span className="mt-1 text-xs text-ivory/70">{creature.role}</span>
               <div className="mt-2 w-full space-y-1.5 border-t border-gold/15 pt-2">
                 {[...creature.skills, creature.ascension!].map((s) => (
-                  <div key={s} className="text-[0.7rem] leading-tight">
+                  <div key={s} className="text-xs leading-tight">
                     <span className={s === creature.ascension ? 'text-gold-bright' : 'text-gold'}>
                       {s === creature.ascension ? '✦ ' : ''}
                       {CONTENT.skills[s].name}

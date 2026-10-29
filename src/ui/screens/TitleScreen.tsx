@@ -42,7 +42,7 @@ export function TitleScreen({ hasSave, onContinue, onNew }: { hasSave: boolean; 
           </div>
         )}
       </div>
-      <p className="absolute bottom-3 text-[0.7rem] tracking-widest text-mist/60">MVP · v0.1</p>
+      <p className="absolute bottom-3 text-xs tracking-widest text-mist/60">MVP · v0.1</p>
     </div>
   )
 }

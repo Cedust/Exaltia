@@ -39,6 +39,13 @@ interface Layout {
   portrait: boolean
   /** Size of the box a creature sprite is fitted into. */
   sprite: number
+  /**
+   * Scale for text, bars and the Turn Order. A portrait canvas is shrunk to fit a phone's width, so its labels
+   * are drawn larger to stay readable without zooming.
+   */
+  ui: number
+  /** Widest a creature's name may run before it wraps: the room between two neighbouring cells. */
+  nameWidth: number
   turnY: number
   bossY: number
   pos: (side: Side, lane: number, row: 'front' | 'back') => { x: number; y: number }
@@ -58,9 +65,11 @@ export function makeLayout(width: number, height: number): Layout {
       width,
       height,
       portrait: true,
-      sprite: 150,
-      turnY: 56,
-      bossY: 138,
+      sprite: 168,
+      ui: 1.5,
+      nameWidth: 150,
+      turnY: 74,
+      bossY: 196,
       pos: (side, lane, row) => ({
         x: side === 'player' ? (row === 'front' ? 268 : 94) : row === 'front' ? 452 : 626,
         y: mid + (lane - 1) * Math.min(300, (height - 420) / 3),
@@ -73,6 +82,8 @@ export function makeLayout(width: number, height: number): Layout {
     height,
     portrait: false,
     sprite: 165,
+    ui: 1,
+    nameWidth: 200,
     turnY: 46,
     bossY: 112,
     pos: (side, lane, row) => ({
@@ -114,6 +125,7 @@ const DURATION = { turn: 220, action: 520, hit: 420, status: 280, ascension: 130
 const DISPLAY = 'Cinzel, Georgia, serif'
 const SANS = '"Alegreya Sans", system-ui, sans-serif'
 const RESOLUTION = Math.min(2, Math.max(1, Math.round(globalThis.devicePixelRatio || 1)))
+const px = (size: number, scale = 1) => `${Math.round(size * scale)}px`
 const style = (overrides: Phaser.Types.GameObjects.Text.TextStyle): Phaser.Types.GameObjects.Text.TextStyle => ({
   fontFamily: SANS,
   resolution: RESOLUTION,
@@ -134,6 +146,7 @@ class UnitView {
   private readonly statuses = new Map<StatusId, number>()
   private readonly scene: Phaser.Scene
   private readonly barWidth: number
+  private readonly ui: number
   readonly unit: UnitSnapshot
   readonly home: { x: number; y: number }
   readonly size: number
@@ -144,6 +157,8 @@ class UnitView {
     this.unit = unit
     this.home = layout.pos(unit.side, unit.position.lane, unit.position.row)
     this.size = layout.sprite * (unit.boss ? 1.22 : 1)
+    this.ui = layout.ui
+    const ui = layout.ui
     const { x, y } = this.home
     this.container = scene.add.container(x, y)
     this.container.setDepth(y)
@@ -158,23 +173,27 @@ class UnitView {
     this.sprite = scene.add.image(0, this.size * 0.42, textureKey(unit.creature)).setOrigin(0.5, 1).setFlipX(unit.side === 'enemy')
     this.sprite.setScale(Math.min(this.size / this.sprite.width, this.size / this.sprite.height))
 
-    this.barWidth = Math.round(this.size * 0.82)
+    this.barWidth = Math.round(this.size * (layout.portrait ? 0.9 : 0.82))
     const top = this.size * 0.5
     const name = scene.add
-      .text(0, top + 4, unit.name, style({ fontFamily: DISPLAY, fontSize: unit.boss ? '17px' : '15px', color: css(element), fontStyle: 'bold', stroke: '#0a0918', strokeThickness: 4 }))
+      .text(0, top + 4, unit.name, style({ fontFamily: DISPLAY, fontSize: px(unit.boss ? 17 : 15, ui), color: css(element), fontStyle: 'bold', stroke: '#0a0918', strokeThickness: 4 * ui, align: 'center', wordWrap: { width: layout.nameWidth } }))
       .setOrigin(0.5, 0)
+      .setLineSpacing(-4 * ui)
+    // Bars sit right under the name, which may have wrapped onto two lines.
+    const barsY = top + 4 + name.height + 4 * ui
     const bar = (yy: number, h: number, color: number) => {
       const bg = scene.add.rectangle(-this.barWidth / 2, yy, this.barWidth, h, 0x05040c, 0.85).setOrigin(0, 0.5).setStrokeStyle(1, 0xe6c47a, 0.35)
       const fill = scene.add.rectangle(-this.barWidth / 2, yy, this.barWidth, h, color).setOrigin(0, 0.5)
       return [bg, fill] as const
     }
-    const [lifeforceBg, lifeforceFill] = bar(top + 30, unit.boss ? 10 : 8, 0x5fd38a)
-    const [essenceBg, essenceFill] = bar(top + 40, 4, 0x6fa8ff)
+    const lifeH = (unit.boss ? 10 : 8) * ui
+    const [lifeforceBg, lifeforceFill] = bar(barsY + lifeH / 2, lifeH, 0x5fd38a)
+    const [essenceBg, essenceFill] = bar(barsY + lifeH + 3 * ui, 4 * ui, 0x6fa8ff)
     this.lifeforceFill = lifeforceFill
     this.essenceFill = essenceFill
     const parts: Phaser.GameObjects.GameObject[] = [this.glow, shadow, this.ring, this.sprite, name, lifeforceBg, lifeforceFill, essenceBg, essenceFill]
     if (unit.hasAscension) {
-      const [ascBg, ascFill] = bar(top + 47, 4, GOLD)
+      const [ascBg, ascFill] = bar(barsY + lifeH + 9 * ui, 4 * ui, GOLD)
       this.ascensionFill = ascFill
       ascFill.setScale(0, 1)
       parts.push(ascBg, ascFill)
@@ -236,12 +255,19 @@ class UnitView {
     else this.statuses.set(status, turns)
     this.statusRow.removeAll(true)
     const list = [...this.statuses.keys()]
-    const w = 50
+    const ui = this.ui
+    const w = 50 * ui
+    const h = 18 * ui
+    // Larger pills (portrait) go two to a row, stacking upwards, so they stay within the creature's cell.
+    const perRow = ui > 1 ? 2 : list.length
     list.forEach((s, i) => {
-      const x = (i - (list.length - 1) / 2) * (w + 4)
-      const pill = this.scene.add.rectangle(x, 0, w, 18, 0x0a0918, 0.85).setStrokeStyle(1, STATUS_COLOR[s], 0.9)
+      const row = Math.floor(i / perRow)
+      const inRow = Math.min(perRow, list.length - row * perRow)
+      const x = ((i % perRow) - (inRow - 1) / 2) * (w + 4)
+      const y = -row * (h + 3)
+      const pill = this.scene.add.rectangle(x, y, w, h, 0x0a0918, 0.85).setStrokeStyle(1, STATUS_COLOR[s], 0.9)
       const label = this.scene.add
-        .text(x, 0, statusName(s), style({ fontSize: '11px', color: css(STATUS_COLOR[s]), fontStyle: 'bold' }))
+        .text(x, y, statusName(s), style({ fontSize: px(11, ui), color: css(STATUS_COLOR[s]), fontStyle: 'bold' }))
         .setOrigin(0.5)
       this.statusRow.add([pill, label])
     })
@@ -364,7 +390,7 @@ export class BattleScene extends Phaser.Scene {
         g.lineBetween(left, between, right, between)
       }
       this.add
-        .text(width / 2, y, LANE_NAMES[lane].toUpperCase(), style({ fontFamily: DISPLAY, fontSize: '13px', color: '#e6c47a' }))
+        .text(width / 2, y, LANE_NAMES[lane].toUpperCase(), style({ fontFamily: DISPLAY, fontSize: px(13, this.layout.ui), color: '#e6c47a' }))
         .setOrigin(0.5)
         .setAlpha(0.35)
         .setAngle(-90)
@@ -394,14 +420,14 @@ export class BattleScene extends Phaser.Scene {
   }
 
   private drawBossBars(bosses: UnitSnapshot[]) {
-    const { width, bossY, portrait } = this.layout
+    const { width, bossY, portrait, ui } = this.layout
     bosses.forEach((boss, i) => {
       const w = portrait ? width - 120 : 420
       const x = portrait ? width / 2 : width / 2 + (i - (bosses.length - 1) / 2) * (w + 40)
-      const y = bossY + (portrait ? i * 44 : 0)
-      this.add.text(x - w / 2, y - 24, boss.name.toUpperCase(), style({ fontFamily: DISPLAY, fontSize: '15px', color: css(ELEMENT_COLOR[boss.element]), fontStyle: 'bold', stroke: '#0a0918', strokeThickness: 4 })).setDepth(2000)
-      this.add.rectangle(x, y + 6, w + 6, 16, 0x05040c, 0.9).setStrokeStyle(1.5, GOLD, 0.8).setDepth(2000)
-      const fill = this.add.rectangle(x - w / 2, y + 6, w, 10, 0xe0574f).setOrigin(0, 0.5).setDepth(2000)
+      const y = bossY + (portrait ? i * 44 * ui : 0)
+      this.add.text(x - w / 2, y - 24 * ui, boss.name.toUpperCase(), style({ fontFamily: DISPLAY, fontSize: px(15, ui), color: css(ELEMENT_COLOR[boss.element]), fontStyle: 'bold', stroke: '#0a0918', strokeThickness: 4 * ui })).setDepth(2000)
+      this.add.rectangle(x, y + 6, w + 6, 16 * ui, 0x05040c, 0.9).setStrokeStyle(1.5, GOLD, 0.8).setDepth(2000)
+      const fill = this.add.rectangle(x - w / 2, y + 6, w, 10 * ui, 0xe0574f).setOrigin(0, 0.5).setDepth(2000)
       this.bossBars.set(boss.id, { fill, max: boss.maxLifeforce })
     })
   }
@@ -560,10 +586,11 @@ export class BattleScene extends Phaser.Scene {
   }
 
   private float(view: UnitView, text: string, color: string, offsetY = 0, size = 24) {
+    const ui = Math.sqrt(this.layout.ui)
     const label = this.add
-      .text(view.home.x + Phaser.Math.Between(-10, 10), view.home.y - view.size * 0.25 - offsetY, text, style({
+      .text(view.home.x + Phaser.Math.Between(-10, 10), view.home.y - view.size * 0.25 - offsetY * ui, text, style({
         fontFamily: DISPLAY,
-        fontSize: `${size}px`,
+        fontSize: px(size, ui),
         color,
         fontStyle: 'bold',
         stroke: '#0a0918',
@@ -617,12 +644,13 @@ export class BattleScene extends Phaser.Scene {
   }
 
   private banner(view: UnitView, title: string, subtitle: string) {
-    const y = view.home.y - view.size * 0.62 - 26
+    const ui = this.layout.ui
+    const y = view.home.y - view.size * 0.62 - 26 * ui
     const group = this.add.container(view.home.x, y)
     const titleText = this.add
-      .text(0, -10, title, style({ fontFamily: DISPLAY, fontSize: '19px', color: '#fff3d1', fontStyle: 'bold', stroke: '#0a0918', strokeThickness: 5 }))
+      .text(0, -10 * ui, title, style({ fontFamily: DISPLAY, fontSize: px(19, ui), color: '#fff3d1', fontStyle: 'bold', stroke: '#0a0918', strokeThickness: 5 }))
       .setOrigin(0.5)
-    const sub = this.add.text(0, 12, subtitle, style({ fontSize: '13px', color: '#e6c47a', backgroundColor: '#0a0918cc', padding: { x: 6, y: 2 } })).setOrigin(0.5)
+    const sub = this.add.text(0, 12 * ui, subtitle, style({ fontSize: px(13, ui), color: '#e6c47a', backgroundColor: '#0a0918cc', padding: { x: 6, y: 2 } })).setOrigin(0.5)
     group.add([sub, titleText])
     // Keep the banner inside the screen.
     const half = Math.max(titleText.width, sub.width) / 2 + 8
@@ -659,7 +687,8 @@ export class BattleScene extends Phaser.Scene {
       .setOrigin(0.5)
     const parts: Phaser.GameObjects.GameObject[] = [glow, big]
     if (subtitle) {
-      parts.push(this.add.text(0, stay ? 54 : 42, subtitle, style({ fontFamily: DISPLAY, fontSize: '22px', color: '#fff3d1', stroke: '#0a0918', strokeThickness: 5 })).setOrigin(0.5))
+      const ui = this.layout.ui
+      parts.push(this.add.text(0, (stay ? 54 : 42) * ui, subtitle, style({ fontFamily: DISPLAY, fontSize: px(22, ui), color: '#fff3d1', stroke: '#0a0918', strokeThickness: 5, align: 'center', wordWrap: { width: width - 40 } })).setOrigin(0.5, 0.3))
     }
     group.add(parts)
     group.setScale(0.8).setAlpha(0)
@@ -671,9 +700,9 @@ export class BattleScene extends Phaser.Scene {
   private drawTurnOrder(ids: string[]) {
     const container = this.turnOrder!
     container.removeAll(true)
-    const { width, turnY, portrait } = this.layout
+    const { width, turnY, portrait, ui } = this.layout
     const slots = portrait ? 8 : 9
-    const size = 46
+    const size = Math.round(46 * ui)
     const gap = 8
     const startX = width / 2 - ((slots - 1) * (size + gap)) / 2
     ids.slice(0, slots).forEach((id, i) => {
@@ -686,7 +715,7 @@ export class BattleScene extends Phaser.Scene {
       container.add([disc, image])
     })
     container.add(
-      this.add.text(startX - size / 2 - 4, turnY + size / 2 + 6, 'TURN ORDER', style({ fontFamily: DISPLAY, fontSize: '11px', color: '#e6c47a' })),
+      this.add.text(startX - size / 2 - 4, turnY + size / 2 + 6 + (ui > 1 ? 4 : 0), 'TURN ORDER', style({ fontFamily: DISPLAY, fontSize: px(11, ui), color: '#e6c47a' })),
     )
   }
 }

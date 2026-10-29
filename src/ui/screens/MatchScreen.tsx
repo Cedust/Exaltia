@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { runBattle } from '../../core/battle'
 import type { BattleResult } from '../../core/types'
 import { CONTENT } from '../../data'
@@ -94,21 +94,21 @@ export function Score({ match }: { match: DuelMatch }) {
   const pips = (wins: number, color: string) => (
     <span className="flex gap-1">
       {Array.from({ length: need }, (_, i) => (
-        <span key={i} className={`h-2.5 w-2.5 rotate-45 border ${i < wins ? `${color} border-transparent` : 'border-gold/40'}`} />
+        <span key={i} className={`h-3 w-3 rotate-45 border ${i < wins ? `${color} border-transparent` : 'border-gold/40'}`} />
       ))}
     </span>
   )
   return (
     <div className="flex items-center justify-center gap-4 py-2">
-      <div className="flex w-24 flex-col items-center gap-1">
-        <span className="label-caps !text-[0.6rem]">You</span>
+      <div className="flex w-28 flex-col items-center gap-1">
+        <span className="label-caps !text-2xs">You</span>
         {pips(match.wins.player, 'bg-gold')}
       </div>
-      <div className="font-display text-2xl text-gold-bright">
+      <div className="font-display text-3xl text-gold-bright">
         {match.wins.player} – {match.wins.enemy}
       </div>
-      <div className="flex w-24 flex-col items-center gap-1">
-        <span className="label-caps max-w-full truncate !text-[0.6rem]">{match.opponent}</span>
+      <div className="flex w-28 flex-col items-center gap-1">
+        <span className="label-caps line-clamp-2 max-w-full text-center !text-2xs leading-tight">{match.opponent}</span>
         {pips(match.wins.enemy, 'bg-[#e0574f]')}
       </div>
     </div>
@@ -121,17 +121,17 @@ export function VowCard({ id, selected, onClick, carrier }: { id: string; select
   const body = (
     <>
       <div className="flex items-baseline justify-between gap-2">
-        <span className={`font-display text-sm tracking-wide ${style.color}`}>{vow.name}</span>
-        <span className={`label-caps !text-[0.55rem] ${style.color}`}>{style.label}</span>
+        <span className={`font-display text-base tracking-wide ${style.color}`}>{vow.name}</span>
+        <span className={`label-caps !text-2xs ${style.color}`}>{style.label}</span>
       </div>
-      <div className="label-caps !text-[0.55rem]">
+      <div className="label-caps !text-2xs">
         {KIND_NAMES[vow.kind]} · {vow.carrier ?? (vow.scope === 'creature' ? 'one creature' : vow.scope === 'team' ? 'whole team' : 'Front Row')}
         {carrier && carrier !== vow.carrier && <span className="text-ivory"> · {carrier}</span>}
       </div>
-      <p className="mt-1 text-xs leading-snug text-ivory/85">{vow.text}</p>
+      <p className="mt-1 text-sm leading-snug text-ivory/90">{vow.text}</p>
     </>
   )
-  const cls = `block w-full rounded-md border bg-night/70 p-2.5 text-left transition ${style.ring} ${selected ? 'ring-2 ring-gold' : ''}`
+  const cls = `block w-full rounded-md border bg-night/70 p-3 text-left transition ${style.ring} ${selected ? 'ring-2 ring-gold' : ''}`
   return onClick ? (
     <button type="button" className={cls} onClick={onClick}>
       {body}
@@ -144,13 +144,13 @@ export function VowCard({ id, selected, onClick, carrier }: { id: string; select
 export function VowList({ title, vows, slots }: { title: string; vows: SwornVow[]; slots: DuelSlot[] }) {
   return (
     <div>
-      <div className="label-caps mb-1 !text-[0.6rem]">{title}</div>
+      <div className="label-caps mb-1">{title}</div>
       {vows.length === 0 ? (
-        <p className="text-xs text-mist/70">No Vows yet.</p>
+        <p className="text-sm text-mist/70">No Vows yet.</p>
       ) : (
         <div className="space-y-1">
           {vows.map((v, i) => (
-            <div key={i} className="text-xs">
+            <div key={i} className="text-sm">
               <span className={RARITY_STYLE[VOW_BY_ID[v.vow].rarity].color}>{VOW_BY_ID[v.vow].name}</span>
               <span className="text-mist"> · {carrierName(v, slots)}</span>
             </div>
@@ -201,13 +201,18 @@ function PickView({ match: initial, onFight, onForfeit }: { match: DuelMatch; on
     setChoice(id)
     setTarget(undefined)
   }
+  // On a phone the carrier picker sits below the fold: bring it into view once a Vow needs one.
+  const carriers = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    if (needsTarget) carriers.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+  }, [choice, needsTarget])
   const fight = (sworn: SwornVow | null) => onFight(sworn ? swear(match, 'player', sworn) : match)
   // The preview already counts the Vow you are about to swear.
   const tentative = choice && ready ? swear(match, 'player', resolveVow(match, 'player', choice, target)) : match
   const preview = previewTargets(tentative.player, tentative.enemy, tentative.vows)
 
   return (
-    <div className="relative min-h-full pb-32">
+    <div className="relative min-h-full pb-36">
       <Ambience backdrop={match.backdrop} dim={0.72} />
       <ScreenHeader
         title={`Round ${roundNumber(match)}`}
@@ -230,23 +235,23 @@ function PickView({ match: initial, onFight, onForfeit }: { match: DuelMatch; on
         )}
         <Score match={match} />
         {last && (
-          <p className="text-center text-xs text-mist">
+          <p className="text-center text-sm text-mist">
             {last === 'player' ? 'You won the last round.' : last === 'enemy' ? 'You lost the last round: you see 4 Vows, one at least Rare.' : 'The last round was a draw.'}
             {rules.atLeast === 'exalted' && ' Match point against you: one Exalted Vow is guaranteed.'}
           </p>
         )}
         {firstRound && (
-          <p className="text-center text-xs text-mist">Win {winsNeeded(match)} rounds to take the match. Every Vow you swear lasts until the match ends.</p>
+          <p className="text-center text-sm text-mist">Win {winsNeeded(match)} rounds to take the match. Every Vow you swear lasts until the match ends.</p>
         )}
 
         {revealed && (
           <>
-            <Divider>{match.opponent} swore</Divider>
+            <Divider className="mb-2 mt-5">{match.opponent} swore</Divider>
             <VowCard id={revealed.vow} carrier={carrierName(revealed, match.enemy)} />
           </>
         )}
 
-        <Divider>Swear your Vow</Divider>
+        <Divider className="mb-2 mt-5">Swear your Vow</Divider>
         {offer.length === 0 ? (
           <p className="text-center text-sm text-mist">You have no Vow left to swear. Fight on with what you hold.</p>
         ) : (
@@ -257,10 +262,10 @@ function PickView({ match: initial, onFight, onForfeit }: { match: DuelMatch; on
           </div>
         )}
         {offer.length > 0 && (
-          <div className="mt-2 flex justify-center gap-2">
+          <div className="mt-3 grid grid-cols-2 gap-2">
             <button
               type="button"
-              className="btn-ghost !px-3 !py-1 text-xs"
+              className="btn-ghost"
               disabled={match.rerollsLeft <= 0}
               onClick={() => {
                 setMatch((m) => ({ ...m, rerollsLeft: m.rerollsLeft - 1, rerolls: m.rerolls + 1 }))
@@ -269,15 +274,15 @@ function PickView({ match: initial, onFight, onForfeit }: { match: DuelMatch; on
             >
               Reroll · {match.rerollsLeft}
             </button>
-            <button type="button" className="btn-ghost !px-3 !py-1 text-xs" onClick={() => fight(autoPick(match, offer))}>
+            <button type="button" className="btn-ghost" onClick={() => fight(autoPick(match, offer))}>
               Auto-pick
             </button>
           </div>
         )}
 
         {needsTarget && (
-          <>
-            <Divider>Who carries {chosen!.name}?</Divider>
+          <div ref={carriers} className="scroll-mb-36">
+            <Divider className="mb-2 mt-5">Who carries {chosen!.name}?</Divider>
             <div className="flex flex-wrap justify-center gap-2">
               {match.player.map((s, i) => {
                 const creature = CONTENT.creatures[s.creature]
@@ -288,19 +293,19 @@ function PickView({ match: initial, onFight, onForfeit }: { match: DuelMatch; on
                     type="button"
                     disabled={!allowed}
                     onClick={() => setTarget(i)}
-                    className={`ornate-soft flex w-20 flex-col items-center p-1.5 disabled:opacity-30 ${target === i ? '!border-gold shadow-[0_0_20px_rgba(230,196,122,0.35)]' : ''}`}
+                    className={`ornate-soft flex w-24 flex-col items-center p-1.5 disabled:opacity-30 ${target === i ? '!border-gold shadow-[0_0_20px_rgba(230,196,122,0.35)]' : ''}`}
                   >
-                    <CreatureArt creature={creature} className="h-14 w-14" />
-                    <span className="w-full truncate text-center font-display text-[0.62rem] text-gold-bright">{creature.name}</span>
+                    <CreatureArt creature={creature} className="h-16 w-16" />
+                    <span className="line-clamp-2 w-full text-center font-display text-2xs leading-tight text-gold-bright">{creature.name}</span>
                   </button>
                 )
               })}
             </div>
-          </>
+          </div>
         )}
 
-        <Divider>Formation</Divider>
-        {match.reformed && <p className="mb-2 text-center text-xs text-[#ffb0a8]">{match.opponent} lost the last round and re-formed its team.</p>}
+        <Divider className="mb-2 mt-5">Formation</Divider>
+        {match.reformed && <p className="mb-2 text-center text-sm text-[#ffb0a8]">{match.opponent} lost the last round and re-formed its team.</p>}
         <FormationGrid
           player={match.player}
           enemy={match.enemy}
@@ -309,7 +314,7 @@ function PickView({ match: initial, onFight, onForfeit }: { match: DuelMatch; on
           onChange={(player) => setMatch((m) => ({ ...m, player }))}
         />
 
-        <div className="mt-4 grid grid-cols-2 gap-3 rounded border border-gold/15 bg-night/50 p-3">
+        <div className="mt-5 grid grid-cols-2 gap-3 rounded border border-gold/15 bg-night/50 p-3">
           <VowList title="Your Vows" vows={match.vows.player} slots={match.player} />
           <VowList title="Their Vows" vows={match.vows.enemy} slots={match.enemy} />
         </div>

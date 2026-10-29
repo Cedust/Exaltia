@@ -27,15 +27,15 @@ export function Hub({ tab, onTab, children }: { tab: HubTab; onTab: (tab: HubTab
   const title = save.tournamentOrder.length > 0 ? 'Sigilbearer' : 'Unsworn'
   return (
     <div className="fixed inset-0 flex flex-col">
-      <header className="relative z-20 flex items-center gap-3 border-b border-gold/25 bg-night/85 px-3 py-2 backdrop-blur-md">
-        <Sigil size={34} glow={false} className="shrink-0" />
+      <header className="relative z-20 flex items-center gap-3 border-b border-gold/25 bg-night/85 px-3 py-2.5 backdrop-blur-md">
+        <Sigil size={40} glow={false} className="shrink-0" />
         <div className="min-w-0 flex-1">
-          <div className="truncate font-display text-sm tracking-[0.12em] text-gold-bright">{save.name}</div>
-          <div className="truncate text-[0.68rem] text-mist">
+          <div className="truncate font-display text-base tracking-[0.12em] text-gold-bright">{save.name}</div>
+          <div className="truncate text-sm text-mist">
             {title} · {ACT_NAMES[act]}
           </div>
         </div>
-        <div className="flex items-center gap-1 rounded-full border border-gold/35 bg-black/40 px-3 py-1 font-display text-sm text-gold-bright" title="Oath Shards">
+        <div className="flex items-center gap-1 rounded-full border border-gold/35 bg-black/40 px-3 py-1.5 font-display text-base text-gold-bright" title="Oath Shards">
           <ShardIcon /> {save.shards}
         </div>
       </header>
@@ -46,10 +46,12 @@ export function Hub({ tab, onTab, children }: { tab: HubTab; onTab: (tab: HubTab
             key={t.id}
             type="button"
             onClick={() => onTab(t.id)}
-            className={`flex flex-col items-center gap-0.5 pt-2 transition ${tab === t.id ? 'text-gold-bright' : 'text-mist'}`}
+            aria-current={tab === t.id ? 'page' : undefined}
+            className={`relative flex min-h-16 flex-col items-center justify-center gap-1 pt-2 transition ${tab === t.id ? 'text-gold-bright' : 'text-mist'}`}
           >
-            <span className={`text-lg leading-none ${tab === t.id ? 'drop-shadow-[0_0_8px_rgba(255,220,150,0.8)]' : ''}`}>{t.icon}</span>
-            <span className="font-display text-[0.62rem] tracking-[0.18em]">{t.label.toUpperCase()}</span>
+            {tab === t.id && <span className="absolute inset-x-5 top-0 h-0.5 rounded-full bg-gold shadow-[0_0_10px_rgba(255,220,150,0.8)]" />}
+            <span className={`text-2xl leading-none ${tab === t.id ? 'drop-shadow-[0_0_8px_rgba(255,220,150,0.8)]' : ''}`}>{t.icon}</span>
+            <span className="font-display text-xs font-bold tracking-[0.06em]">{t.label}</span>
           </button>
         ))}
       </nav>
@@ -67,7 +69,7 @@ const ELEMENT_PAIRS: [Element, Element][] = [
 function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
     <section className="ornate-soft p-3">
-      <h2 className="font-display text-sm tracking-[0.15em] text-gold-bright">{title}</h2>
+      <h2 className="font-display text-base tracking-[0.15em] text-gold-bright">{title}</h2>
       <div className="mt-2">{children}</div>
     </section>
   )
@@ -90,22 +92,22 @@ export function JournalView() {
                 {m}
               </li>
             ))}
-            {memories < OATH_MEMORIES.length && <li className="text-xs text-mist">{OATH_MEMORIES.length - memories} memories remain hidden.</li>}
+            {memories < OATH_MEMORIES.length && <li className="text-sm text-mist">{OATH_MEMORIES.length - memories} memories remain hidden.</li>}
           </ol>
         )}
       </Section>
 
       <Section title={`Vows · ${save.vows.length} / ${VOWS.length}`}>
-        <p className="text-xs text-mist">Vows you know can appear in your offers between rounds. The First Trial and every Challenge teach new ones.</p>
+        <p className="text-sm text-mist">Vows you know can appear in your offers between rounds. The First Trial and every Challenge teach new ones.</p>
         <div className="mt-2 space-y-1.5">
           {VOWS.map((v) =>
             save.vows.includes(v.id) ? (
-              <div key={v.id} className="text-xs">
+              <div key={v.id} className="text-sm">
                 <span className={`font-bold ${RARITY_STYLE[v.rarity].color}`}>{v.name}</span>
                 <span className="text-mist"> · {v.text}</span>
               </div>
             ) : (
-              <div key={v.id} className="text-xs text-mist/50">
+              <div key={v.id} className="text-sm text-mist/50">
                 ??? · {RARITY_STYLE[v.rarity].label}
               </div>
             ),
@@ -114,10 +116,10 @@ export function JournalView() {
       </Section>
 
       <Section title="Elements">
-        <p className="text-xs text-mist">Every element has an opposite. A skill against a creature of its opposite element is Weak: +50% damage. Physical has no opposite.</p>
+        <p className="text-sm text-mist">Every element has an opposite. A skill against a creature of its opposite element is Weak: +50% damage. Physical has no opposite.</p>
         <div className="mt-2 grid grid-cols-2 gap-2">
           {ELEMENT_PAIRS.map(([a, b]) => (
-            <div key={a} className="flex items-center justify-center gap-2 rounded border border-white/10 bg-black/25 py-1.5 text-xs">
+            <div key={a} className="flex items-center justify-center gap-2 rounded border border-white/10 bg-black/25 py-1.5 text-sm">
               <ElementGem element={a} />
               <span style={{ color: ELEMENT_HEX[a] }}>{elementName(a)}</span>
               <span className="text-mist">⇄</span>
@@ -131,7 +133,7 @@ export function JournalView() {
       <Section title="Status Effects">
         <div className="grid gap-1.5 sm:grid-cols-2">
           {STATUS_IDS.map((id) => (
-            <div key={id} className="text-xs">
+            <div key={id} className="text-sm">
               <span className={`font-bold ${STATUS_RULES[id].kind === 'buff' ? 'text-emerald-300' : 'text-rose-300'}`}>{STATUS_RULES[id].name}</span>
               <span className="text-mist"> · {STATUS_RULES[id].description}</span>
             </div>
@@ -140,7 +142,7 @@ export function JournalView() {
       </Section>
 
       <Section title="How battles work">
-        <ul className="space-y-1.5 text-xs leading-snug text-ivory/85">
+        <ul className="space-y-1.5 text-sm leading-snug text-ivory/85">
           <li>✦ Every battle is a <b>match</b> of short auto rounds: best of 5 in Tournaments, best of 3 or 1 in Challenges and duels.</li>
           <li>✦ Before each round the opponent swears a <b>Vow</b> and shows it. Then you pick one of 3 (4 after a lost round). Vows last until the match ends.</li>
           <li>✦ Your team is locked for the match, but you may move creatures to any cell of the grid before every round. The opponent re-forms only after it loses a round.</li>
@@ -158,7 +160,7 @@ export function JournalView() {
       </Section>
 
       <Section title="Growing stronger">
-        <ul className="space-y-1.5 text-xs leading-snug text-ivory/85">
+        <ul className="space-y-1.5 text-sm leading-snug text-ivory/85">
           <li>✦ <b>Awakening 1–10</b>: Paragons gain XP in every battle. Each level gives an Awakening Point for the Skill Tree.</li>
           <li>✦ <b>Mastery ★1–5</b>: every skill grows stronger the more it is used.</li>
           <li>✦ <b>Oath Rank I–V</b>: spend Oath Shards on a Paragon for steady growth and a perk at every rank.</li>
@@ -178,7 +180,7 @@ export function MenuView({ onReplayScene, onQuit, onDelete }: { onReplayScene: (
   return (
     <div className="mx-auto max-w-md space-y-3 px-3 pb-6 pt-4">
       <Section title="Journey">
-        <div className="grid grid-cols-2 gap-2 text-xs text-mist">
+        <div className="grid grid-cols-2 gap-2 text-sm text-mist">
           <span>Battles fought</span>
           <span className="text-right text-ivory">{save.stats.battles}</span>
           <span>Victories</span>
@@ -196,7 +198,7 @@ export function MenuView({ onReplayScene, onQuit, onDelete }: { onReplayScene: (
               key={s}
               type="button"
               onClick={() => update((x) => ({ ...x, speed: s }))}
-              className={`flex-1 py-1.5 font-display text-sm ${s === save.speed ? 'bg-gold/25 text-gold-bright' : 'text-mist'}`}
+              className={`flex-1 py-2.5 font-display text-base ${s === save.speed ? 'bg-gold/25 text-gold-bright' : 'text-mist'}`}
             >
               {s}×
             </button>
@@ -208,11 +210,11 @@ export function MenuView({ onReplayScene, onQuit, onDelete }: { onReplayScene: (
           {['tessa', 'hesper', 'cassian'].map((id) => (
             <div key={id} className="flex flex-col items-center">
               <img src={characterUrl(id)} alt={id} className="h-20 w-16 rounded border border-gold/30 bg-ink object-cover object-top" />
-              <span className="mt-1 font-display text-xs capitalize text-ivory">{id}</span>
+              <span className="mt-1 font-display text-sm capitalize text-ivory">{id}</span>
             </div>
           ))}
         </div>
-        <button type="button" className="btn-ghost mt-3 w-full text-xs" onClick={onReplayScene}>
+        <button type="button" className="btn-ghost mt-3 w-full" onClick={onReplayScene}>
           Replay the last story scene
         </button>
       </Section>
@@ -220,7 +222,7 @@ export function MenuView({ onReplayScene, onQuit, onDelete }: { onReplayScene: (
         Back to title
       </button>
       {!confirm ? (
-        <button type="button" className="w-full py-2 text-xs text-rose-300/80 underline-offset-2 hover:underline" onClick={() => setConfirm(true)}>
+        <button type="button" className="w-full py-3 text-sm text-rose-300/80 underline-offset-2 hover:underline" onClick={() => setConfirm(true)}>
           Delete this journey
         </button>
       ) : (
@@ -236,7 +238,7 @@ export function MenuView({ onReplayScene, onQuit, onDelete }: { onReplayScene: (
           </div>
         </div>
       )}
-      <p className="pt-2 text-center text-[0.65rem] leading-relaxed text-mist/70">
+      <p className="pt-2 text-center text-xs leading-relaxed text-mist/70">
         Exaltia: Paragons of the Oath · MVP v0.1
         <br />
         Design by Timo · built with Claude · art generated with ChatGPT

@@ -47,12 +47,12 @@ export function CollectionView({ onOpen }: { onOpen: (id: string) => void }) {
                   onClick={() => onOpen(id)}
                   className={`ornate-soft relative flex flex-col items-center px-1 pb-2 pt-1 transition ${mine ? 'active:scale-[0.98]' : 'opacity-70'}`}
                 >
-                  {inTeam && <span className="absolute left-1.5 top-1.5 rounded-full bg-gold/80 px-1.5 text-[0.55rem] font-bold text-night">TEAM</span>}
+                  {inTeam && <span className="absolute left-1.5 top-1.5 rounded-full bg-gold/80 px-1.5 text-2xs font-bold text-night">TEAM</span>}
                   <ElementGem element={creature.element} className="absolute right-1.5 top-1.5" />
                   <CreatureArt creature={creature} className="h-24 w-full" dim={!mine} halo={!!mine} />
                   <span className={`mt-1 truncate font-display text-xs tracking-wide ${mine ? 'text-ivory' : 'text-mist'}`}>{mine ? creature.name : '???'}</span>
-                  {mine && creature.kind === 'paragon' && <span className="text-[0.62rem] text-gold">Awakening {awakeningOf(mine.xp)}</span>}
-                  {!mine && <span className="text-[0.6rem] text-mist/70">{elementName(creature.element)}</span>}
+                  {mine && creature.kind === 'paragon' && <span className="text-2xs text-gold">Awakening {awakeningOf(mine.xp)}</span>}
+                  {!mine && <span className="text-2xs text-mist/70">{elementName(creature.element)}</span>}
                 </button>
               )
             })}
@@ -132,7 +132,7 @@ export function CreatureScreen({ creatureId, onBack }: { creatureId: string; onB
         {paragon && (
           <div className="mt-4 flex overflow-hidden rounded-md border border-gold/30">
             {(['skills', 'tree', 'oath'] as const).map((t) => (
-              <button key={t} type="button" onClick={() => setTab(t)} className={`flex-1 py-2 font-display text-xs tracking-[0.15em] ${tab === t ? 'bg-gold/20 text-gold-bright' : 'text-mist'}`}>
+              <button key={t} type="button" onClick={() => setTab(t)} className={`min-h-11 flex-1 py-2 font-display text-xs tracking-[0.12em] ${tab === t ? 'bg-gold/20 text-gold-bright' : 'text-mist'}`}>
                 {t === 'skills' ? 'SKILLS' : t === 'tree' ? `SKILL TREE${treeState(owned).available > 0 ? ` (${treeState(owned).available})` : ''}` : `OATH ${ROMAN[oathRank(owned)]}`}
               </button>
             ))}
@@ -153,7 +153,7 @@ export function CreatureScreen({ creatureId, onBack }: { creatureId: string; onB
                   </div>
                   <p className="text-xs text-ivory/85">{describeSkill(def)}</p>
                   {paragon && (
-                    <p className="mt-0.5 text-[0.68rem] text-mist">
+                    <p className="mt-0.5 text-xs text-mist">
                       Mastery {stars}: {MASTERY_EFFECTS[stars]}
                       {stars < 5 && ` · next at ${MASTERY_USES[stars + 1]} uses (${uses} so far)`}
                     </p>
@@ -163,10 +163,10 @@ export function CreatureScreen({ creatureId, onBack }: { creatureId: string; onB
             })}
             {creature.ascension && (
               <div className="ornate p-2.5">
-                <div className="label-caps !text-[0.6rem]">Ascension</div>
+                <div className="label-caps !text-2xs">Ascension</div>
                 <span className="font-display text-sm text-gold-bright">✦ {(loadout.skillDefs?.[creature.ascension] ?? CONTENT.skills[creature.ascension]).name}</span>
                 <p className="text-xs text-ivory/85">{describeSkill(loadout.skillDefs?.[creature.ascension] ?? CONTENT.skills[creature.ascension])}</p>
-                <p className="mt-0.5 text-[0.68rem] text-mist">Fires on its own when the golden gauge is full. The gauge fills when this Paragon acts, takes damage or sees an ally fall.</p>
+                <p className="mt-0.5 text-xs text-mist">Fires on its own when the golden gauge is full. The gauge fills when this Paragon acts, takes damage or sees an ally fall.</p>
               </div>
             )}
           </div>
@@ -201,13 +201,13 @@ function SkillTreeView({ owned, setOwned }: { owned: OwnedCreature; setOwned: (c
           Reset paths
         </button>
       </div>
-      <p className="mt-1 px-1 text-[0.7rem] text-mist">Each Awakening level gives 1 point. Nodes cost 1, Capstones 2. Resetting is free: try builds against each opponent.</p>
+      <p className="mt-1 px-1 text-xs text-mist">Each Awakening level gives 1 point. Nodes cost 1, Capstones 2. Resetting is free: try builds against each opponent.</p>
       <div className="mt-3 grid gap-3 sm:grid-cols-3">
         {tree.map((path, p) => (
           <div key={path.name} className="ornate-soft p-2.5">
             <div className="text-center">
               <div className="font-display text-sm tracking-wider text-gold-bright">{path.name}</div>
-              <div className="label-caps !text-[0.55rem]">{path.theme}</div>
+              <div className="label-caps !text-2xs">{path.theme}</div>
             </div>
             <div className="mt-2 space-y-1.5">
               {path.nodes.map((node, n) => {
@@ -226,11 +226,11 @@ function SkillTreeView({ owned, setOwned }: { owned: OwnedCreature; setOwned: (c
                     }`}
                   >
                     <div className="flex items-center gap-1.5">
-                      <span className={`text-[0.6rem] ${has ? 'text-gold-bright' : 'text-mist'}`}>{has ? '◆' : '◇'}</span>
+                      <span className={`text-2xs ${has ? 'text-gold-bright' : 'text-mist'}`}>{has ? '◆' : '◇'}</span>
                       <span className="text-xs font-bold text-ivory">{label.title}</span>
-                      <span className="ml-auto text-[0.55rem] uppercase text-mist">{node.kind}</span>
+                      <span className="ml-auto text-2xs uppercase text-mist">{node.kind}</span>
                     </div>
-                    <p className="text-[0.66rem] leading-snug text-mist">{label.detail}</p>
+                    <p className="text-xs leading-snug text-mist">{label.detail}</p>
                   </button>
                 )
               })}
@@ -245,9 +245,9 @@ function SkillTreeView({ owned, setOwned }: { owned: OwnedCreature; setOwned: (c
                     onClick={() => buy(id)}
                     className={`w-full rounded border-2 px-2 py-2 text-left transition ${has ? 'border-gold bg-gold/20 shadow-[0_0_16px_rgba(230,196,122,0.35)]' : can ? 'border-gold/60 bg-black/30' : 'border-white/10 bg-black/20 opacity-55'}`}
                   >
-                    <div className="label-caps !text-[0.55rem]">Capstone · 2 points</div>
+                    <div className="label-caps !text-2xs">Capstone · 2 points</div>
                     <div className="text-xs font-bold text-gold-bright">{path.capstone.name}</div>
-                    <p className="text-[0.66rem] leading-snug text-mist">{path.capstone.description}</p>
+                    <p className="text-xs leading-snug text-mist">{path.capstone.description}</p>
                   </button>
                 )
               })()}
@@ -300,7 +300,7 @@ function OathView({
             +10
           </button>
         </div>
-        <p className="mt-2 text-[0.68rem] text-mist">Ranks VI–X need this Paragon's own Sigil Shards (coming with the endgame Spire).</p>
+        <p className="mt-2 text-xs text-mist">Ranks VI–X need this Paragon's own Sigil Shards (coming with the endgame Spire).</p>
       </div>
 
       {needsAttunement && (
@@ -313,7 +313,7 @@ function OathView({
               onClick={() => setOwned((o) => ({ ...o, attunements: [...o.attunements, 'offense'] }))}
             >
               <span className="font-display text-sm tracking-wider text-gold-bright">Offense</span>
-              <span className="text-[0.7rem] text-mist">+8% Might & Resonance</span>
+              <span className="text-xs text-mist">+8% Might & Resonance</span>
             </button>
             <button
               type="button"
@@ -321,7 +321,7 @@ function OathView({
               onClick={() => setOwned((o) => ({ ...o, attunements: [...o.attunements, 'defense'] }))}
             >
               <span className="font-display text-sm tracking-wider text-gold-bright">Defense</span>
-              <span className="text-[0.7rem] text-mist">+8% Guard & Ward</span>
+              <span className="text-xs text-mist">+8% Guard & Ward</span>
             </button>
           </div>
         </div>
@@ -339,7 +339,7 @@ function OathView({
                   {perk.name}
                   {attunement && <span className="ml-1 font-normal capitalize text-gold">({attunement})</span>}
                 </div>
-                <div className="text-[0.68rem] text-mist">{perk.description}</div>
+                <div className="text-xs text-mist">{perk.description}</div>
               </div>
             </div>
           )

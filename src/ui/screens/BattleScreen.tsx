@@ -77,28 +77,25 @@ export function BattleScreen({
 
   return (
     <div className="fixed inset-0 flex flex-col bg-night">
-      <div className="relative z-10 flex items-center gap-2 border-b border-gold/20 bg-night/85 px-3 py-2 backdrop-blur">
+      <div className="relative z-10 flex items-center gap-1.5 border-b border-gold/20 bg-night/85 px-3 py-2 backdrop-blur">
         <div className="min-w-0 flex-1">
-          <div className="truncate font-display text-sm tracking-[0.12em] text-gold-bright">{encounter.name}</div>
-          <div className="truncate text-[0.7rem] text-mist">vs {encounter.opponent}</div>
+          <div className="truncate font-display text-base tracking-[0.08em] text-gold-bright">{encounter.name}</div>
+          <div className="truncate text-sm text-mist">vs {encounter.opponent}</div>
         </div>
-        <div className="flex overflow-hidden rounded-full border border-gold/40">
-          {SPEEDS.map((s) => (
-            <button
-              key={s}
-              type="button"
-              onClick={() => onSpeed(s)}
-              className={`px-2.5 py-1 font-display text-xs ${s === speed ? 'bg-gold/25 text-gold-bright' : 'text-mist'}`}
-            >
-              {s}×
-            </button>
-          ))}
-        </div>
-        <button type="button" className="btn-ghost !px-3 !py-1 text-xs" onClick={() => setLogOpen((o) => !o)}>
+        {/* One button that cycles the speed keeps the header to a single row on a phone. */}
+        <button
+          type="button"
+          className="btn-ghost !min-w-12 !px-2.5 !py-1"
+          aria-label={`Battle speed ${speed}×, tap to change`}
+          onClick={() => onSpeed(SPEEDS[(SPEEDS.indexOf(speed) + 1) % SPEEDS.length])}
+        >
+          {speed}×
+        </button>
+        <button type="button" className="btn-ghost !px-2.5 !py-1" onClick={() => setLogOpen((o) => !o)}>
           Log
         </button>
         {!finished && (
-          <button type="button" className="btn-ghost !px-3 !py-1 text-xs" onClick={() => playback.skipToEnd()}>
+          <button type="button" className="btn-ghost !px-2.5 !py-1" onClick={() => playback.skipToEnd()}>
             Skip
           </button>
         )}
@@ -109,10 +106,10 @@ export function BattleScreen({
         <PhaserGame key={view.orientation} battle={battle} orientation={view.orientation} />
 
         {logOpen && (
-          <div className="absolute inset-x-0 bottom-0 z-20 max-h-[45%] overflow-y-auto border-t border-gold/30 bg-night/92 px-3 py-2 text-xs leading-relaxed text-mist backdrop-blur fade-in sm:inset-x-auto sm:right-0 sm:top-0 sm:max-h-none sm:w-96 sm:border-l sm:border-t-0">
+          <div className="absolute inset-x-0 bottom-0 z-20 max-h-[50%] overflow-y-auto border-t border-gold/30 bg-night/92 px-3 py-2 text-sm leading-relaxed text-mist backdrop-blur fade-in sm:inset-x-auto sm:right-0 sm:top-0 sm:max-h-none sm:w-96 sm:border-l sm:border-t-0">
             <div className="label-caps mb-1 flex items-center justify-between">
               <span>Battle Log</span>
-              <button type="button" className="text-gold" onClick={() => setLogOpen(false)}>
+              <button type="button" className="min-h-11 px-2 text-gold" onClick={() => setLogOpen(false)}>
                 close ✕
               </button>
             </div>

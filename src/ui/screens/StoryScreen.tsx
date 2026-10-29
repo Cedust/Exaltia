@@ -66,7 +66,7 @@ export function StoryScreen({
       <Ambience backdrop={backdrop} dim={0.35} motes={12} />
       <button
         type="button"
-        className="btn-ghost absolute right-3 top-3 z-20 !px-3 !py-1.5 !text-[0.65rem]"
+        className="btn-ghost absolute right-3 top-3 z-20 !px-3 !py-1.5 !text-xs"
         onClick={(e) => {
           e.stopPropagation()
           onDone()
@@ -102,7 +102,7 @@ export function StoryScreen({
                 {name}
               </div>
             )}
-            <p className={`${narrator ? 'lore text-xl text-ivory/90' : 'text-[1.08rem] leading-relaxed'}`}>
+            <p className={`${narrator ? 'lore text-xl text-ivory/90' : 'text-lg leading-relaxed'}`}>
               {text.slice(0, shown)}
               <span className="opacity-0">{text.slice(shown)}</span>
             </p>
