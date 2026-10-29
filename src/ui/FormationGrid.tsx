@@ -87,9 +87,7 @@ export function FormationGrid<T extends DuelSlot>({
       {(onChange || preview) && (
         <div className="flex min-h-11 items-center gap-2 pb-1">
           <p className={`min-w-0 flex-1 px-1 text-sm leading-snug ${selected !== null ? 'text-gold-bright' : 'text-mist/80'}`}>
-            {onChange && (selected !== null && player[selected]
-              ? `Move ${CONTENT.creatures[player[selected].creature].name}: tap a cell, or another creature to swap.`
-              : 'Tap one of your creatures to move it.')}
+            {onChange && selected !== null && player[selected] && `Move ${CONTENT.creatures[player[selected].creature].name}: tap a cell, or another creature to swap.`}
           </p>
           {preview && (
             <button

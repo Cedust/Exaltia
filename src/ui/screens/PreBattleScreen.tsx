@@ -288,7 +288,6 @@ function TeamStep({ enemy, rules }: { enemy: MatchMember[]; rules: BattleRules }
             )
           })}
         </div>
-        <p className="mt-3 text-center text-xs text-mist">The team stays together for the whole match. You can re-form it before every round.</p>
       </section>
 
       {shown && (
