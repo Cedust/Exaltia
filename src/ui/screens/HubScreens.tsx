@@ -11,6 +11,13 @@ import { VOWS } from '../../game/vows'
 import { ElementGem, ShardIcon, Sigil } from '../kit'
 import { ELEMENT_HEX, RARITY_STYLE, characterUrl } from '../styles'
 
+/** A touch screen laid out much wider than the device: the browser renders the desktop version of the page. */
+const desktopModeOnPhone = () => navigator.maxTouchPoints > 0 && window.innerWidth > window.screen.width * 1.3
+
+/** Layout width, screen width and pixel ratio, for checking how a device renders the game. */
+const viewportInfo = () =>
+  `view ${window.innerWidth}×${window.innerHeight} · screen ${window.screen.width}×${window.screen.height} · dpr ${window.devicePixelRatio.toFixed(2)}`
+
 export type HubTab = 'map' | 'collection' | 'journal' | 'menu'
 
 const TABS: { id: HubTab; label: string }[] = [
@@ -72,6 +79,11 @@ export function Hub({ tab, onTab, children }: { tab: HubTab; onTab: (tab: HubTab
           <ShardIcon className="!h-5 !w-5" /> {save.shards}
         </div>
       </header>
+      {desktopModeOnPhone() && (
+        <p className="relative z-20 bg-[#5a1f2a] px-4 py-2 text-center text-sm text-ivory">
+          Your browser shows the desktop version, so everything looks small. Turn off "Desktop site" in the browser menu.
+        </p>
+      )}
       <main className="relative flex-1 overflow-y-auto overflow-x-hidden">{children}</main>
       {/* A native-style tab bar: big icons with a pill behind the active one, labels in the sans face. */}
       <nav className="relative z-20 grid grid-cols-4 border-t border-gold/20 bg-[#0d0b20]/95 px-1 pt-2 backdrop-blur-md safe-bottom">
@@ -280,6 +292,8 @@ export function MenuView({ onReplayScene, onQuit, onDelete }: { onReplayScene: (
         Exaltia: Paragons of the Oath · MVP v0.1
         <br />
         Design by Timo · built with Claude · art generated with ChatGPT
+        <br />
+        <span className="font-mono">{viewportInfo()}</span>
       </p>
     </div>
   )
