@@ -22,7 +22,6 @@ export function PrepareFlow({
   header,
   steps,
   current,
-  hint,
   back,
   next,
   children,
@@ -31,8 +30,6 @@ export function PrepareFlow({
   header: ReactNode
   steps: FlowStep[]
   current: number
-  /** One line above the action bar: what is missing, or what happens next. */
-  hint?: ReactNode
   /** Bottom left: usually the previous step. */
   back?: { label: string; onClick: () => void }
   /** Bottom right: the next step, or the fight. */
@@ -57,7 +54,6 @@ export function PrepareFlow({
 
       <footer className="safe-bottom relative shrink-0 border-t border-gold/25 bg-night/95 px-3 pt-2.5 shadow-[0_-12px_30px_rgba(0,0,0,0.5)]">
         <div className="mx-auto max-w-xl">
-          {hint && <div className="mb-2 text-center text-xs text-mist">{hint}</div>}
           <div className="flex items-center gap-2.5">
             {back && (
               <button type="button" className="btn-ghost shrink-0 !px-3.5" onClick={back.onClick}>

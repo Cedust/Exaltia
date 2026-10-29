@@ -278,22 +278,12 @@ function PickView({
           ? { label: 'Choose a carrier', onClick: () => setPicking(true) }
           : { label: 'Choose a Vow', disabled: true, onClick: () => {} }
 
-  const hint =
-    step === 'vow'
-      ? sworn
-        ? <>You swear <span className={RARITY_STYLE[VOW_BY_ID[sworn.vow].rarity].color}>{VOW_BY_ID[sworn.vow].name}</span> · {carrierName(sworn, match.player)}</>
-        : offer.length === 0
-          ? 'No Vow left to swear: fight on with what you hold.'
-          : `Answer ${match.opponent}: pick one of ${offer.length} Vows.`
-      : undefined
-
   return (
     <PrepareFlow
       backdrop={match.backdrop}
       header={<FlowHeader title={`Round ${round}`} subtitle={`${match.name} · best of ${match.bestOf}`} onBack={leave} />}
       steps={steps}
       current={firstRound ? 2 + index : index}
-      hint={hint}
       back={step === 'formation' ? { label: 'Vow', onClick: () => setStep('vow') } : firstRound && onPrepare ? { label: 'Team', onClick: () => onPrepare('team') } : undefined}
       next={next}
     >

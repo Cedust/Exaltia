@@ -3,18 +3,17 @@ import { opposite } from '../../core/rules'
 import type { Element } from '../../core/types'
 import { CONTENT } from '../../data'
 import type { Encounter } from '../../data/world'
-import { allowedIn, battleRules, bestOfFor, bossVowsFor, describeModifier, enemyMembers, formationProblems, joinFormation, themeOf, type BattleRules } from '../../game/battles'
-import { carrierName, LANE_NAMES, type MatchMember } from '../../game/duel'
+import { allowedIn, battleRules, bestOfFor, bossVowsFor, describeModifier, enemyMembers, formationProblems, joinFormation, type BattleRules } from '../../game/battles'
+import { carrierName, type MatchMember } from '../../game/duel'
 import { playerLoadout } from '../../game/loadout'
 import { awakeningOf } from '../../game/rules'
 import { tournamentsWon, type SaveState } from '../../game/save'
-import { VOW_BY_ID } from '../../game/vows'
 import { CreatureInfoSheet } from '../CreatureInfo'
 import { useGame } from '../GameContext'
 import { CreatureArt, Divider, ElementGem, ElementLabel } from '../kit'
 import { FlowHeader, PrepareFlow } from '../PrepareFlow'
 import { haptic, matchSteps, type PrepStep } from '../prepare'
-import { ELEMENT_TEXT, RARITY_STYLE } from '../styles'
+import { ELEMENT_TEXT } from '../styles'
 import { VowCard } from './MatchScreen'
 
 
@@ -54,13 +53,6 @@ export function PreBattleScreen({
       steps={steps}
       current={index}
       back={step === 'team' ? { label: 'Scout', onClick: () => onStep('scout') } : undefined}
-      hint={
-        step === 'team'
-          ? problems.length > 0
-            ? <span className="text-red-200">{problems[0]}</span>
-            : 'Team ready. Next you swear your first Vow.'
-          : `Win ${Math.ceil(bestOf / 2)} round${bestOf > 1 ? 's' : ''} to take the match.`
-      }
       next={
         step === 'scout'
           ? { label: 'Next: Team ›', onClick: () => onStep('team') }
@@ -79,7 +71,6 @@ export function PreBattleScreen({
 function ScoutStep({ encounter, enemy, rules, bestOf }: { encounter: Encounter; enemy: MatchMember[]; rules: BattleRules; bestOf: number }) {
   const { save } = useGame()
   const [info, setInfo] = useState<number | null>(null)
-  const theme = themeOf(encounter)
   const bossVows = bossVowsFor(save, encounter)
   const weak = weaknessesOf(enemy)
   const counters = save.order.filter((id) => allowedIn(rules, id) && weak.includes(CONTENT.creatures[id].element))
@@ -121,11 +112,8 @@ function ScoutStep({ encounter, enemy, rules, bestOf }: { encounter: Encounter; 
                   haptic()
                   setInfo(i)
                 }}
-                className={`ornate-soft relative flex flex-col items-center px-2 pb-2 pt-6 text-center transition active:scale-[0.98] ${member.boss ? '!border-red-300/50 shadow-[0_0_20px_rgba(224,87,79,0.25)]' : ''}`}
+                className={`ornate-soft relative flex flex-col items-center px-2 pb-2 pt-5 text-center transition active:scale-[0.98] ${member.boss ? '!border-red-300/50 shadow-[0_0_20px_rgba(224,87,79,0.25)]' : ''}`}
               >
-                <span className="absolute left-2 top-1.5 text-2xs uppercase tracking-wider text-mist">
-                  {LANE_NAMES[member.lane]} · {member.row}
-                </span>
                 {member.boss && <span className="absolute right-1.5 top-1 rounded-sm bg-red-500/30 px-1.5 text-2xs uppercase tracking-widest text-red-100">Boss</span>}
                 <CreatureArt creature={creature} flip className="h-24 w-24" />
                 <span className="mt-1 line-clamp-1 font-display text-sm text-gold-bright">{creature.name}</span>
@@ -138,8 +126,8 @@ function ScoutStep({ encounter, enemy, rules, bestOf }: { encounter: Encounter; 
         </div>
       </section>
 
-      <section className="ornate-soft bleed divide-y divide-gold/15">
-        {weak.length > 0 && (
+      {weak.length > 0 && (
+        <section className="ornate-soft bleed">
           <div className="px-4 py-3">
             <div className="label-caps !text-2xs">Their weakness</div>
             <div className="mt-1.5 flex flex-wrap gap-x-4 gap-y-1">
@@ -156,19 +144,8 @@ function ScoutStep({ encounter, enemy, rules, bestOf }: { encounter: Encounter; 
                 : 'None of your creatures strikes this weakness yet.'}
             </p>
           </div>
-        )}
-        <div className="px-4 py-3">
-          <div className="label-caps !text-2xs">How they swear · {theme.theme}</div>
-          <p className="mt-0.5 text-xs text-mist">Before every round they reveal a Vow first, then you answer with one of yours. They favour:</p>
-          <div className="mt-2 flex flex-wrap gap-1.5">
-            {theme.prefers.map((id) => (
-              <span key={id} className={`rounded-full border border-white/10 bg-black/30 px-2.5 py-0.5 text-xs ${RARITY_STYLE[VOW_BY_ID[id].rarity].color}`}>
-                {VOW_BY_ID[id].name}
-              </span>
-            ))}
-          </div>
-        </div>
-      </section>
+        </section>
+      )}
 
       {bossVows.length > 0 && (
         <section>
@@ -187,7 +164,6 @@ function ScoutStep({ encounter, enemy, rules, bestOf }: { encounter: Encounter; 
           loadout={shown.loadout}
           enemy
           boss={shown.boss}
-          place={shown}
           onClose={() => setInfo(null)}
         />
       )}
