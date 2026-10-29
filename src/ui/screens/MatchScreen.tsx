@@ -285,7 +285,7 @@ function PickView({
         : offer.length === 0
           ? 'No Vow left to swear: fight on with what you hold.'
           : `Answer ${match.opponent}: pick one of ${offer.length} Vows.`
-      : 'Arrows show who strikes whom first.'
+      : undefined
 
   return (
     <PrepareFlow

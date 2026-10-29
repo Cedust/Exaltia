@@ -84,12 +84,33 @@ export function FormationGrid<T extends DuelSlot>({
 
   return (
     <div className="space-y-1">
-      {onChange && (
-        <p className={`min-h-11 px-2 pb-1 text-center text-sm ${selected !== null ? 'text-gold-bright' : 'text-mist/80'}`}>
-          {selected !== null && player[selected]
-            ? `Move ${CONTENT.creatures[player[selected].creature].name}: tap a cell, or another creature to swap.`
-            : 'Tap one of your creatures to move it.'}
-        </p>
+      {(onChange || preview) && (
+        <div className="flex min-h-11 items-center gap-2 pb-1">
+          <p className={`min-w-0 flex-1 px-1 text-sm leading-snug ${selected !== null ? 'text-gold-bright' : 'text-mist/80'}`}>
+            {onChange && (selected !== null && player[selected]
+              ? `Move ${CONTENT.creatures[player[selected].creature].name}: tap a cell, or another creature to swap.`
+              : 'Tap one of your creatures to move it.')}
+          </p>
+          {preview && (
+            <button
+              type="button"
+              aria-pressed={showArrows}
+              aria-label={showArrows ? 'Hide target arrows' : 'Show target arrows'}
+              onClick={() => {
+                haptic()
+                setShowArrows((v) => !v)
+              }}
+              className={`flex h-11 shrink-0 items-center gap-1.5 rounded-full border px-3.5 font-display text-2xs uppercase tracking-wider transition ${
+                showArrows ? 'border-gold bg-gold/20 text-gold-bright' : 'border-gold/30 bg-black/30 text-mist'
+              }`}
+            >
+              <svg viewBox="0 0 16 16" className="h-4 w-4" aria-hidden>
+                <path d="M2 13 L12 4 M8 3.5 H12.5 V8" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+              Targets
+            </button>
+          )}
+        </div>
       )}
       <div className={`grid ${COLUMNS} gap-1 text-center`}>
         <span className="label-caps col-span-2 !text-2xs">You</span>
@@ -151,19 +172,6 @@ export function FormationGrid<T extends DuelSlot>({
           </svg>
         )}
       </div>
-      {preview && (
-        <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-xs text-mist">
-          <button type="button" className="min-h-11 px-2 text-gold underline underline-offset-4" onClick={() => setShowArrows((v) => !v)}>
-            {showArrows ? 'Hide targets' : 'Show targets'}
-          </button>
-          <span>
-            <span className="text-gold">—</span> your first target · <span className="text-[#ff8a7a]">—</span> theirs · dashed = Snipe
-          </span>
-          <span>
-            <span className="text-gold/80">◆</span> protected · <span className="text-red-300">◇</span> open
-          </span>
-        </div>
-      )}
     </div>
   )
 }

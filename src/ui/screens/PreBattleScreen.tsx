@@ -96,7 +96,7 @@ function ScoutStep({ encounter, enemy, rules, bestOf }: { encounter: Encounter; 
             {rules.teamSize}v{rules.teamSize}
           </Chip>
           <Chip>
-            Best of {bestOf} · first to {Math.ceil(bestOf / 2)}
+            Best of {bestOf}
           </Chip>
           {(encounter.modifiers ?? [])
             .filter((m) => m.type !== 'teamSize')

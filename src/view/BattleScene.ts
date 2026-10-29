@@ -179,8 +179,13 @@ class UnitView {
       .text(0, top + 4, unit.name, style({ fontFamily: DISPLAY, fontSize: px(unit.boss ? 17 : 15, ui), color: css(element), fontStyle: 'bold', stroke: '#0a0918', strokeThickness: 4 * ui, align: 'center', wordWrap: { width: layout.nameWidth } }))
       .setOrigin(0.5, 0)
       .setLineSpacing(-4 * ui)
-    // Bars sit right under the name, which may have wrapped onto two lines.
-    const barsY = top + 4 + name.height + 4 * ui
+    // Every name gets room for two lines, so all bars line up whether a name wraps or not; a one-line name sits
+    // just above its bars.
+    const lines = Math.max(1, name.getWrappedText().length)
+    const lineH = (name.height + 4 * ui * (lines - 1)) / lines
+    const block = Math.max(name.height, lineH * 2 - 4 * ui)
+    name.setY(top + 4 + block - name.height)
+    const barsY = top + 4 + block + 4 * ui
     const bar = (yy: number, h: number, color: number) => {
       const bg = scene.add.rectangle(-this.barWidth / 2, yy, this.barWidth, h, 0x05040c, 0.85).setOrigin(0, 0.5).setStrokeStyle(1, 0xe6c47a, 0.35)
       const fill = scene.add.rectangle(-this.barWidth / 2, yy, this.barWidth, h, color).setOrigin(0, 0.5)
