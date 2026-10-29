@@ -88,7 +88,7 @@ export function RegionSheet({
           <button type="button" onClick={onTournament} className="ornate-soft mt-3 flex w-full items-center gap-3 p-3 text-left transition hover:border-gold/60">
             <div className="flex-1">
               <div className="font-display text-base tracking-wider text-gold-bright">{region.tournament.name}</div>
-              <div className="text-xs text-mist">{won ? 'Won. The Paragons remember you.' : `Three matches. The winner faces both Paragons.`}</div>
+              {won && <div className="text-xs text-mist">Won. The Paragons remember you.</div>}
               <div className="mt-2 flex gap-1.5">
                 {[0, 1, 2].map((i) => (
                   <span key={i} className={`h-1.5 w-8 rounded-full ${i < stage ? 'bg-gold' : 'bg-white/15'}`} />
@@ -134,7 +134,7 @@ export function RegionSheet({
                         </span>
                       ))}
                       <span className={`rounded-sm px-1.5 text-xs uppercase tracking-wider ${done ? 'bg-gold/20 text-gold-bright' : 'bg-white/5 text-ivory/80'}`}>
-                        {done ? '✓ Won · replay for XP' : `Reward: ${recruit.name} · Vow: ${VOW_BY_ID[CHALLENGE_VOWS[challenge.id]].name}`}
+                        {done ? '✓ Won' : `Reward: ${recruit.name} · Vow: ${VOW_BY_ID[CHALLENGE_VOWS[challenge.id]].name}`}
                       </span>
                       <span className="rounded-sm bg-white/5 px-1.5 text-xs uppercase tracking-wider text-ivory/80">Bo{bestOfFor(challenge)}</span>
                     </div>

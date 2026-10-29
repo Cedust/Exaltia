@@ -297,7 +297,6 @@ function PickView({
                 {rules.atLeast === 'exalted' && ' Match point against you: one Exalted Vow is guaranteed.'}
               </p>
             )}
-            {firstRound && <p className="px-3 pb-2 text-center text-xs text-mist">Every Vow you swear lasts until the match ends.</p>}
           </div>
 
           {revealed && (

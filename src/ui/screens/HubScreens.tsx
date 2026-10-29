@@ -14,7 +14,7 @@ import { ELEMENT_HEX, RARITY_STYLE, characterUrl } from '../styles'
 /** Layout width, screen width and pixel ratio, for checking how a device renders the game. */
 const viewportInfo = () =>
   `view ${window.innerWidth}×${window.innerHeight} · screen ${window.screen.width}×${window.screen.height} · dpr ${window.devicePixelRatio.toFixed(2)}` +
-  ` · scale ${document.documentElement.dataset.fitScale ?? '1'} · ${/Mobile/.test(navigator.userAgent) ? 'mobile' : 'desktop'} UA`
+  ` · ${/Mobile/.test(navigator.userAgent) ? 'mobile' : 'desktop'} UA`
 
 export type HubTab = 'map' | 'collection' | 'journal' | 'menu'
 
