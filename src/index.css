@@ -66,6 +66,19 @@ html {
 @media (max-width: 639px) {
   html { font-size: 112.5%; }
 }
+html.phone { font-size: 112.5%; }
+
+/* Phones never get the wide-screen layouts, even when the browser reports a desktop-sized layout width. */
+@custom-variant sm {
+  @media (width >= 40rem) {
+    html:not(.phone) & {
+      @slot;
+    }
+  }
+}
+
+/* On a phone, centred columns use the full width of the screen. */
+html.phone .mx-auto[class*='max-w-'] { max-width: none; }
 
 /* Feel like an app, not a page: no double-tap zoom delay, no text selection on controls. */
 button, a, [role='button'] {
@@ -349,6 +362,13 @@ input.field { padding-right: 0.7rem; background: rgba(10, 9, 24, 0.75); }
 
 /* Edge to edge on phones: a panel inside a px-3 column drops its side margins, borders and corners,
    like a grouped list in a native app. Wider screens keep the framed card. */
+html.phone .bleed {
+  margin-inline: -0.75rem;
+  border-radius: 0 !important;
+  border-left-width: 0 !important;
+  border-right-width: 0 !important;
+}
+
 @media (max-width: 639px) {
   .bleed {
     margin-inline: -0.75rem;
