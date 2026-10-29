@@ -187,7 +187,7 @@ class UnitView {
     name.setY(top + 4 + block - name.height)
     const barsY = top + 4 + block + 4 * ui
     const bar = (yy: number, h: number, color: number) => {
-      const bg = scene.add.rectangle(-this.barWidth / 2, yy, this.barWidth, h, 0x05040c, 0.85).setOrigin(0, 0.5).setStrokeStyle(1, 0xe6c47a, 0.35)
+      const bg = scene.add.rectangle(-this.barWidth / 2, yy, this.barWidth, h, 0x05040c, 0.85).setOrigin(0, 0.5).setStrokeStyle(1, SIDE_COLOR[unit.side], 0.6)
       const fill = scene.add.rectangle(-this.barWidth / 2, yy, this.barWidth, h, color).setOrigin(0, 0.5)
       return [bg, fill] as const
     }
@@ -221,7 +221,10 @@ class UnitView {
   private drawRing(active: boolean) {
     const r = this.size * 0.42
     this.ring.clear()
-    this.ring.lineStyle(active ? 3 : 1.5, active ? 0xffe7ad : SIDE_COLOR[this.unit.side], active ? 1 : 0.55)
+    // The ground ring carries the side colour (blue yours, red theirs), filled so it reads at a glance.
+    this.ring.fillStyle(SIDE_COLOR[this.unit.side], active ? 0.28 : 0.2)
+    this.ring.fillEllipse(0, this.size * 0.42, r * 2, r * 0.55)
+    this.ring.lineStyle(active ? 3 : 2.5, active ? 0xffe7ad : SIDE_COLOR[this.unit.side], active ? 1 : 0.9)
     this.ring.strokeEllipse(0, this.size * 0.42, r * 2, r * 0.55)
     if (active) {
       this.ring.lineStyle(1, 0xffe7ad, 0.5)
