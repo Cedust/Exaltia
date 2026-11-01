@@ -27,6 +27,9 @@ export function PhaserGame({ battle, orientation }: { battle: BattleSceneData; o
       type: rendererType(),
       parent: containerRef.current!,
       backgroundColor: '#0a0918',
+      // The game has no sound. Without this, every battle opens its own AudioContext, and destroying the game
+      // closes it while Phaser's un-awaited context.resume() (on focus/unlock) is pending -> unhandled rejection.
+      audio: { noAudio: true },
       render: { mipmapFilter: 'LINEAR_MIPMAP_LINEAR' },
       scale: { mode: Phaser.Scale.FIT, autoCenter: Phaser.Scale.CENTER_BOTH, width, height },
     })
