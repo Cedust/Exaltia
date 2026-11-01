@@ -29,6 +29,11 @@ export interface BattleSceneData {
   backdrop?: string
   /** Events up to this index are shown instantly (after a rotation restarts the scene). */
   startAt?: number
+  /**
+   * Device pixels per layout pixel. The game is created this much larger than its layout and the camera zooms
+   * in by the same factor, so the canvas has as many pixels as the screen shows instead of being upscaled.
+   */
+  zoom?: number
 }
 
 export type Orientation = 'landscape' | 'portrait'
@@ -124,11 +129,12 @@ const DURATION = { turn: 220, action: 520, hit: 420, status: 280, ascension: 130
 
 const DISPLAY = 'Cinzel, Georgia, serif'
 const SANS = '"Alegreya Sans", system-ui, sans-serif'
-const RESOLUTION = Math.min(2, Math.max(1, Math.round(globalThis.devicePixelRatio || 1)))
+/** Text is rasterised at the canvas zoom so it stays crisp; set by the scene before it draws. */
+let textResolution = 1
 const px = (size: number, scale = 1) => `${Math.round(size * scale)}px`
 const style = (overrides: Phaser.Types.GameObjects.Text.TextStyle): Phaser.Types.GameObjects.Text.TextStyle => ({
   fontFamily: SANS,
-  resolution: RESOLUTION,
+  resolution: textResolution,
   ...overrides,
 })
 
@@ -317,6 +323,7 @@ export class BattleScene extends Phaser.Scene {
   private startAt = 0
   private layout: Layout = makeLayout(1280, 720)
   private cancelled = false
+  private zoom = 1
 
   constructor() {
     super('BattleScene')
@@ -331,7 +338,9 @@ export class BattleScene extends Phaser.Scene {
     this.views = new Map()
     this.bossBars = new Map()
     this.cancelled = false
-    this.layout = makeLayout(this.scale.width, this.scale.height)
+    this.zoom = data.zoom ?? 1
+    textResolution = Math.min(4, Math.ceil(this.zoom))
+    this.layout = makeLayout(Math.round(this.scale.width / this.zoom), Math.round(this.scale.height / this.zoom))
   }
 
   preload() {
@@ -346,6 +355,7 @@ export class BattleScene extends Phaser.Scene {
 
   create() {
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => (this.cancelled = true))
+    this.cameras.main.setZoom(this.zoom).centerOn(this.layout.width / 2, this.layout.height / 2)
     this.makeTextures()
     this.drawBackground()
     this.turnOrder = this.add.container(0, 0).setDepth(2000)

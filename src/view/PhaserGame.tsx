@@ -23,6 +23,10 @@ export function PhaserGame({ battle, orientation }: { battle: BattleSceneData; o
   useEffect(() => {
     const rect = containerRef.current!.getBoundingClientRect()
     const { width, height } = canvasSize(orientation, rect.width / Math.max(1, rect.height))
+    // Scale.FIT stretches the canvas over the container. Rendering at the layout size and letting CSS upscale it
+    // blurs everything on large or high-dpi screens, so the canvas gets one pixel per device pixel instead.
+    const fit = Math.min(rect.width / width, rect.height / height)
+    const zoom = Phaser.Math.Clamp(fit * (window.devicePixelRatio || 1), 1, 3)
     const game = new Phaser.Game({
       type: rendererType(),
       parent: containerRef.current!,
@@ -31,7 +35,7 @@ export function PhaserGame({ battle, orientation }: { battle: BattleSceneData; o
       // closes it while Phaser's un-awaited context.resume() (on focus/unlock) is pending -> unhandled rejection.
       audio: { noAudio: true },
       render: { mipmapFilter: 'LINEAR_MIPMAP_LINEAR' },
-      scale: { mode: Phaser.Scale.FIT, autoCenter: Phaser.Scale.CENTER_BOTH, width, height },
+      scale: { mode: Phaser.Scale.FIT, autoCenter: Phaser.Scale.CENTER_BOTH, width: Math.round(width * zoom), height: Math.round(height * zoom) },
     })
     let destroyed = false
     game.events.once(Phaser.Core.Events.READY, () => {
@@ -41,7 +45,7 @@ export function PhaserGame({ battle, orientation }: { battle: BattleSceneData; o
         ? Promise.all([document.fonts.load('bold 20px Cinzel'), document.fonts.load('20px Cinzel'), document.fonts.load('bold 14px "Alegreya Sans"'), document.fonts.load('14px "Alegreya Sans"')]).catch(() => undefined)
         : Promise.resolve()
       void fonts.then(() => {
-        if (!destroyed) game.scene.add('BattleScene', BattleScene, true, battleRef.current)
+        if (!destroyed) game.scene.add('BattleScene', BattleScene, true, { ...battleRef.current, zoom })
       })
     })
     return () => {
