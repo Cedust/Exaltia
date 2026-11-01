@@ -19,6 +19,9 @@ function ErrorPanel({ messages }: { messages: string[] }) {
   )
 }
 
+/** Browser audio hiccups (e.g. a closed AudioContext) are harmless for the game and must never show the error screen. */
+const isAudioNoise = (value: unknown) => /AudioContext/i.test(value instanceof Error ? value.message : String(value))
+
 /** Shows uncaught errors on screen, so problems on phones can be reported without dev tools. */
 export function ErrorOverlay() {
   const [messages, setMessages] = useState<string[]>([])
@@ -26,7 +29,10 @@ export function ErrorOverlay() {
   useEffect(() => {
     const add = (message: string) => setMessages((list) => [...list.slice(-4), message])
     const onError = (e: ErrorEvent) => add(describe(e.error ?? e.message))
-    const onRejection = (e: PromiseRejectionEvent) => add(describe(e.reason))
+    const onRejection = (e: PromiseRejectionEvent) => {
+      if (isAudioNoise(e.reason)) return e.preventDefault()
+      add(describe(e.reason))
+    }
     const onReport = (e: Event) => add(String((e as CustomEvent).detail))
     window.addEventListener('error', onError)
     window.addEventListener('unhandledrejection', onRejection)
