@@ -1,6 +1,7 @@
 {
   "name": "Exaltia: Paragons of the Oath",
   "short_name": "Exaltia",
+  "id": "exaltia",
   "description": "Collect Paragons, swear Vows and win the Tournaments of a shattered world.",
   "start_url": "./",
   "scope": "./",
